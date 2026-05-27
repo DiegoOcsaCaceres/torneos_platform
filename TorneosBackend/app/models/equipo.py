@@ -1,6 +1,4 @@
-"""
-Modelo de dominio: Equipo — Avance 1.
-"""
+
 from dataclasses import dataclass, field
 from typing import List, Optional
 
