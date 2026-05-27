@@ -26,7 +26,7 @@ class Jugador:
     posicion: str
     edad: int
     activo: bool = True
-    id: Optional[UUID] = field_default = None
+    id: Optional[UUID] = None
 
     def __str__(self) -> str:
         return f"#{self.numero} {self.nombre} ({self.posicion}) - {self.edad} años"
