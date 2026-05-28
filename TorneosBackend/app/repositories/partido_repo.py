@@ -1,81 +1,96 @@
 """
-Repositorio de acceso a datos para 'fixtures' y 'partidos' — Neon.tech (psycopg2).
+Repositorio de acceso a datos para 'Partido' y 'Partido_Equipo' — Neon.tech (psycopg2).
 """
 import logging
-from uuid import UUID
+from typing import Optional
 
 from app.exceptions import RepositorioError
-from app.models.fixture import Fixture
 from app.models.partido import Partido
+from app.models.partido_equipo import PartidoEquipo
 from config.database import obtener_conexion
 
 logger = logging.getLogger(__name__)
 
 
 class PartidoRepository:
-    """CRUD sobre 'fixtures' y 'partidos' usando psycopg2."""
+    """CRUD sobre 'Partido' y 'Partido_Equipo' usando psycopg2."""
 
-    def guardar_fixture(self, fixture: Fixture) -> dict:
-        """Persiste el fixture del torneo y retorna el registro creado."""
+    def guardar_partido(self, partido: Partido) -> dict:
+        """Persiste un partido y retorna el registro creado."""
         sql = """
-            INSERT INTO fixtures (id_torneo, total_jornadas)
-            VALUES (%s, %s)
+            INSERT INTO Partido (fecha, hora, estado, id_cancha, id_torneo)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING *
         """
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (str(fixture.id_torneo), fixture.total_jornadas))
+                    cur.execute(sql, (
+                        partido.fecha,
+                        partido.hora,
+                        partido.estado,
+                        partido.id_cancha,
+                        partido.id_torneo,
+                    ))
                     return dict(cur.fetchone())
         except Exception as exc:
-            logger.error("PartidoRepository.guardar_fixture -> %s", exc)
-            raise RepositorioError("Error al guardar el fixture.") from exc
+            logger.error("PartidoRepository.guardar_partido -> %s", exc)
+            raise RepositorioError("Error al guardar el partido.") from exc
         finally:
             conn.close()
 
-    def guardar_partidos(self, id_fixture: UUID, partidos: list) -> list:
-        """Inserta en lote todos los partidos de un fixture dentro de una transacción."""
+    def guardar_partido_equipo(self, pe: PartidoEquipo) -> dict:
+        """Inserta una relación Partido_Equipo y retorna el registro creado."""
         sql = """
-            INSERT INTO partidos (id_fixture, id_equipo_local, id_equipo_visita, jornada)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO Partido_Equipo (id_partido, id_equipo, id_condicion)
+            VALUES (%s, %s, %s)
             RETURNING *
         """
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    registros = [
-                        (str(id_fixture), str(p.id_equipo_local),
-                         str(p.id_equipo_visita), p.jornada)
-                        for p in partidos
-                    ]
-                    # executemany no retorna RETURNING; usamos execute en loop
-                    resultados = []
-                    for reg in registros:
-                        cur.execute(sql, reg)
-                        resultados.append(dict(cur.fetchone()))
-                    return resultados
+                    cur.execute(sql, (pe.id_partido, pe.id_equipo, pe.id_condicion))
+                    return dict(cur.fetchone())
         except Exception as exc:
-            logger.error("PartidoRepository.guardar_partidos -> %s", exc)
-            raise RepositorioError("Error al guardar los partidos del fixture.") from exc
+            logger.error("PartidoRepository.guardar_partido_equipo -> %s", exc)
+            raise RepositorioError("Error al guardar Partido_Equipo.") from exc
         finally:
             conn.close()
 
-    def listar_por_torneo(self, id_torneo: UUID) -> list:
-        """Retorna todos los partidos de un torneo ordenados por jornada."""
+    def listar_por_torneo(self, id_torneo: int) -> list:
+        """
+        Retorna todos los partidos de un torneo con sus equipos y condiciones.
+        Cada fila incluye datos del partido más local y visitante.
+        """
         sql = """
-            SELECT p.*
-            FROM partidos p
-            INNER JOIN fixtures f ON f.id = p.id_fixture
-            WHERE f.id_torneo = %s
-            ORDER BY p.jornada
+            SELECT
+                p.id_partido,
+                p.fecha,
+                p.hora,
+                p.estado,
+                p.id_cancha,
+                p.id_torneo,
+                e_local.nombre_equipo  AS equipo_local,
+                e_visit.nombre_equipo  AS equipo_visitante,
+                pe_local.id_partido_equipo  AS id_pe_local,
+                pe_visit.id_partido_equipo  AS id_pe_visitante
+            FROM Partido p
+            JOIN Partido_Equipo pe_local  ON pe_local.id_partido  = p.id_partido
+                                         AND pe_local.id_condicion = 1
+            JOIN Partido_Equipo pe_visit  ON pe_visit.id_partido  = p.id_partido
+                                         AND pe_visit.id_condicion = 2
+            JOIN Equipo e_local   ON e_local.id_equipo  = pe_local.id_equipo
+            JOIN Equipo e_visit   ON e_visit.id_equipo  = pe_visit.id_equipo
+            WHERE p.id_torneo = %s
+            ORDER BY p.fecha, p.hora
         """
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (str(id_torneo),))
+                    cur.execute(sql, (id_torneo,))
                     return [dict(r) for r in cur.fetchall()]
         except Exception as exc:
             logger.error("PartidoRepository.listar_por_torneo -> %s", exc)
@@ -83,37 +98,48 @@ class PartidoRepository:
         finally:
             conn.close()
 
-    def marcar_jugado(self, id_partido: UUID) -> dict:
-        """Marca un partido como jugado."""
-        sql = """
-            UPDATE partidos
-            SET jugado = TRUE, actualizado_en = NOW()
-            WHERE id = %s
-            RETURNING *
-        """
+    def obtener_partido_equipo(self, id_partido_equipo: int) -> Optional[dict]:
+        """Retorna un registro de Partido_Equipo por su ID."""
+        sql = "SELECT * FROM Partido_Equipo WHERE id_partido_equipo = %s"
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (str(id_partido),))
-                    return dict(cur.fetchone())
+                    cur.execute(sql, (id_partido_equipo,))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
         except Exception as exc:
-            logger.error("PartidoRepository.marcar_jugado -> %s", exc)
-            raise RepositorioError("Error al actualizar estado del partido.") from exc
+            logger.error("PartidoRepository.obtener_partido_equipo -> %s", exc)
+            raise RepositorioError("Error al consultar Partido_Equipo.") from exc
         finally:
             conn.close()
 
-    def existe_fixture(self, id_torneo: UUID) -> bool:
-        """Verifica si ya existe un fixture para el torneo."""
-        sql = "SELECT id FROM fixtures WHERE id_torneo = %s"
+    def listar_canchas(self) -> list:
+        """Retorna todas las canchas disponibles."""
+        sql = "SELECT * FROM Cancha ORDER BY id_cancha"
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (str(id_torneo),))
-                    return cur.fetchone() is not None
+                    cur.execute(sql)
+                    return [dict(r) for r in cur.fetchall()]
         except Exception as exc:
-            logger.error("PartidoRepository.existe_fixture -> %s", exc)
-            raise RepositorioError("Error al verificar existencia del fixture.") from exc
+            logger.error("PartidoRepository.listar_canchas -> %s", exc)
+            raise RepositorioError("Error al listar canchas.") from exc
+        finally:
+            conn.close()
+
+    def actualizar_estado(self, id_partido: int, nuevo_estado: str) -> dict:
+        """Actualiza el estado de un partido."""
+        sql = "UPDATE Partido SET estado = %s WHERE id_partido = %s RETURNING *"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (nuevo_estado, id_partido))
+                    return dict(cur.fetchone())
+        except Exception as exc:
+            logger.error("PartidoRepository.actualizar_estado -> %s", exc)
+            raise RepositorioError("Error al actualizar estado del partido.") from exc
         finally:
             conn.close()
