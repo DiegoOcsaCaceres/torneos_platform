@@ -1,8 +1,7 @@
 """
-Repositorio de acceso a datos para la tabla 'equipos' — Neon.tech (psycopg2).
+Repositorio de acceso a datos para la tabla 'Equipo' — Neon.tech (psycopg2).
 """
 import logging
-from uuid import UUID
 
 from app.exceptions import RepositorioError
 from app.models.equipo import Equipo
@@ -12,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class EquipoRepository:
-    """CRUD sobre la tabla 'equipos' usando psycopg2."""
+    """CRUD sobre la tabla 'Equipo' usando psycopg2."""
 
     def guardar(self, equipo: Equipo) -> dict:
         """Inserta un nuevo equipo y retorna el registro creado."""
         sql = """
-            INSERT INTO equipos (nombre, deporte, id_torneo)
+            INSERT INTO Equipo (nombre_equipo, numero_jugadores, id_torneo)
             VALUES (%s, %s, %s)
             RETURNING *
         """
@@ -25,7 +24,11 @@ class EquipoRepository:
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (equipo.nombre, equipo.deporte, str(equipo.id_torneo)))
+                    cur.execute(sql, (
+                        equipo.nombre_equipo,
+                        equipo.numero_jugadores,
+                        equipo.id_torneo,
+                    ))
                     return dict(cur.fetchone())
         except Exception as exc:
             logger.error("EquipoRepository.guardar -> %s", exc)
@@ -33,14 +36,14 @@ class EquipoRepository:
         finally:
             conn.close()
 
-    def existe_en_torneo(self, nombre: str, id_torneo: UUID) -> bool:
-        """Verifica si ya existe un equipo con ese nombre en el torneo (RF-04)."""
-        sql = "SELECT id FROM equipos WHERE nombre = %s AND id_torneo = %s"
+    def existe_en_torneo(self, nombre_equipo: str, id_torneo: int) -> bool:
+        """Verifica si ya existe un equipo con ese nombre en el torneo."""
+        sql = "SELECT id_equipo FROM Equipo WHERE nombre_equipo = %s AND id_torneo = %s"
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (nombre, str(id_torneo)))
+                    cur.execute(sql, (nombre_equipo, id_torneo))
                     return cur.fetchone() is not None
         except Exception as exc:
             logger.error("EquipoRepository.existe_en_torneo -> %s", exc)
@@ -48,18 +51,18 @@ class EquipoRepository:
         finally:
             conn.close()
 
-    def listar_por_torneo(self, id_torneo: UUID) -> list:
-        """Retorna todos los equipos activos de un torneo, ordenados por puntos."""
+    def listar_por_torneo(self, id_torneo: int) -> list:
+        """Retorna todos los equipos de un torneo."""
         sql = """
-            SELECT * FROM equipos
-            WHERE id_torneo = %s AND activo = TRUE
-            ORDER BY puntos DESC
+            SELECT * FROM Equipo
+            WHERE id_torneo = %s
+            ORDER BY id_equipo
         """
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (str(id_torneo),))
+                    cur.execute(sql, (id_torneo,))
                     return [dict(r) for r in cur.fetchall()]
         except Exception as exc:
             logger.error("EquipoRepository.listar_por_torneo -> %s", exc)
@@ -67,39 +70,18 @@ class EquipoRepository:
         finally:
             conn.close()
 
-    def contar_en_torneo(self, id_torneo: UUID) -> int:
-        """Cuenta los equipos activos en un torneo."""
-        sql = "SELECT COUNT(*) AS total FROM equipos WHERE id_torneo = %s AND activo = TRUE"
+    def contar_en_torneo(self, id_torneo: int) -> int:
+        """Cuenta los equipos en un torneo."""
+        sql = "SELECT COUNT(*) AS total FROM Equipo WHERE id_torneo = %s"
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (str(id_torneo),))
+                    cur.execute(sql, (id_torneo,))
                     row = cur.fetchone()
                     return int(row['total']) if row else 0
         except Exception as exc:
             logger.error("EquipoRepository.contar_en_torneo -> %s", exc)
             raise RepositorioError("Error al contar equipos del torneo.") from exc
-        finally:
-            conn.close()
-
-    def actualizar_estadisticas(self, id_equipo: UUID, datos: dict) -> dict:
-        """
-        Actualiza estadísticas de un equipo usando incrementos (+=).
-        datos puede contener: puntos, partidos_jugados, partidos_ganados,
-        partidos_empatados, partidos_perdidos.
-        """
-        campos = ", ".join(f"{k} = {k} + %s" for k in datos)
-        sql = f"UPDATE equipos SET {campos}, actualizado_en = NOW() WHERE id = %s RETURNING *"
-        valores = list(datos.values()) + [str(id_equipo)]
-        conn = obtener_conexion()
-        try:
-            with conn:
-                with conn.cursor() as cur:
-                    cur.execute(sql, valores)
-                    return dict(cur.fetchone())
-        except Exception as exc:
-            logger.error("EquipoRepository.actualizar_estadisticas -> %s", exc)
-            raise RepositorioError("Error al actualizar estadísticas del equipo.") from exc
         finally:
             conn.close()
