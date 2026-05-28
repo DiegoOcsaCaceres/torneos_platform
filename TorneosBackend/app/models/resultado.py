@@ -1,31 +1,24 @@
 """
 Modelo de dominio: Resultado.
+Adaptado al nuevo schema: puntaje por id_partido_equipo.
 """
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Optional
-from uuid import UUID
 
 
 @dataclass
 class Resultado:
     """
-    Registra el marcador final de un partido disputado.
+    Registra el puntaje de un equipo en un partido.
 
     Attributes:
-        id_partido:      UUID del partido al que pertenece.
-        marcador_local:  Tantos/sets del equipo local.
-        marcador_visita: Tantos/sets del equipo visitante.
-        es_valido:       Indica si el resultado fue validado correctamente.
-        fecha_registro:  Timestamp de registro del resultado.
-        id:              UUID asignado tras la persistencia.
+        puntaje:           Goles/sets anotados por el equipo.
+        id_partido_equipo: FK a la relación Partido_Equipo.
+        id_resultado:      ID serial asignado tras la persistencia.
     """
-    id_partido: UUID
-    marcador_local: int
-    marcador_visita: int
-    es_valido: bool = True
-    fecha_registro: Optional[datetime] = None
-    id: Optional[UUID] = None
+    puntaje: int
+    id_partido_equipo: int
+    id_resultado: Optional[int] = None
 
     def __str__(self) -> str:
-        return f"{self.marcador_local} - {self.marcador_visita}"
+        return f"Resultado: {self.puntaje} pts (PartidoEquipo #{self.id_partido_equipo})"
