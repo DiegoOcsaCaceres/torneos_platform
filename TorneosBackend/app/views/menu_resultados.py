@@ -1,6 +1,6 @@
 """
 Vista: Menú de Resultados y Tabla de Posiciones.
-Delega toda la lógica al ResultadoController.
+Adaptado al nuevo schema: IDs enteros, puntaje por Partido_Equipo.
 """
 from app.controllers.resultado_controller import ResultadoController
 
@@ -11,7 +11,7 @@ class MenuResultados:
     OPCIONES = {
         '1': 'Registrar resultado de partido',
         '2': 'Ver tabla de posiciones',
-        '3': 'Consultar resultado de partido',
+        '3': 'Ver marcador de un partido',
         '0': 'Volver al menú principal',
     }
 
@@ -33,7 +33,7 @@ class MenuResultados:
             elif opcion == '2':
                 self._ver_tabla()
             elif opcion == '3':
-                self._ver_resultado()
+                self._ver_marcador()
             elif opcion == '0':
                 break
             else:
@@ -42,22 +42,23 @@ class MenuResultados:
     # ── Acciones ──────────────────────────────────────────────────────────
     def _registrar_resultado(self) -> None:
         print("\n── Registrar Resultado ──────────────────────────")
+        print("  (Obtenga los IDs de Partido_Equipo desde 'Ver fixture')")
         id_partido = input("ID del partido: ").strip()
-        id_local = input("ID del equipo local: ").strip()
-        id_visita = input("ID del equipo visitante: ").strip()
+        id_pe_local = input("ID Partido_Equipo del local: ").strip()
+        id_pe_visita = input("ID Partido_Equipo del visitante: ").strip()
         id_torneo = input("ID del torneo: ").strip()
-        marcador_local = input("Marcador local: ").strip()
-        marcador_visita = input("Marcador visitante: ").strip()
+        puntaje_local = input("Puntaje del local: ").strip()
+        puntaje_visita = input("Puntaje del visitante: ").strip()
 
         exito, mensaje, _ = self._ctrl.registrar(
             id_partido_str=id_partido,
-            id_equipo_local_str=id_local,
-            id_equipo_visita_str=id_visita,
+            id_pe_local_str=id_pe_local,
+            id_pe_visita_str=id_pe_visita,
             id_torneo_str=id_torneo,
-            marcador_local_str=marcador_local,
-            marcador_visita_str=marcador_visita,
+            puntaje_local_str=puntaje_local,
+            puntaje_visita_str=puntaje_visita,
         )
-        self._mostrar_resultado(exito, mensaje)
+        self._mostrar_msg(exito, mensaje)
 
     def _ver_tabla(self) -> None:
         print("\n── Tabla de Posiciones ──────────────────────────")
@@ -66,27 +67,28 @@ class MenuResultados:
         print(f"{'✔' if exito else '✗'}  {mensaje}\n")
 
         if tabla:
-            encabezado = f"  {'Pos':3}  {'Equipo':28}  {'Pts':4}  {'PG':4}  {'PE':4}  {'PP':4}"
-            print(encabezado)
-            print("  " + "─" * (len(encabezado) - 2))
+            print(f"  {'Pos':3}  {'Equipo':30}  {'Pts':4}  {'PJ':4}  {'PG':4}")
+            print("  " + "─" * 52)
             for pos, fila in enumerate(tabla, start=1):
-                nombre = fila.get('equipos', {}).get('nombre', fila.get('id_equipo', '?')[:8])
                 print(
-                    f"  {pos:<3}  {nombre:<28}  {fila['puntos']:<4}  "
-                    f"{fila['pg']:<4}  {fila['pe']:<4}  {fila['pp']:<4}"
+                    f"  {pos:<3}  {fila['nombre_equipo']:<30}  "
+                    f"{fila['puntos_totales']:<4}  "
+                    f"{fila['partidos_jugados']:<4}  "
+                    f"{fila['partidos_ganados']:<4}"
                 )
 
-    def _ver_resultado(self) -> None:
-        print("\n── Resultado de Partido ─────────────────────────")
+    def _ver_marcador(self) -> None:
+        print("\n── Marcador de Partido ──────────────────────────")
         id_partido = input("ID del partido: ").strip()
-        exito, mensaje, resultado = self._ctrl.ver_resultado(id_partido)
-        self._mostrar_resultado(exito, mensaje)
-        if resultado:
+        exito, mensaje, marcador = self._ctrl.ver_marcador(id_partido)
+        self._mostrar_msg(exito, mensaje)
+        for fila in marcador:
             print(
-                f"   Marcador: {resultado['marcador_local']} - {resultado['marcador_visita']}"
+                f"   {fila['nombre_condicion']:10} | "
+                f"{fila['nombre_equipo']:25} | "
+                f"Puntaje: {fila['puntaje']}"
             )
 
     @staticmethod
-    def _mostrar_resultado(exito: bool, mensaje: str) -> None:
-        icono = '✔' if exito else '✗'
-        print(f"\n{icono}  {mensaje}")
+    def _mostrar_msg(exito: bool, mensaje: str) -> None:
+        print(f"\n{'✔' if exito else '✗'}  {mensaje}")

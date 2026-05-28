@@ -1,11 +1,11 @@
 """
 Vista: Menú Principal.
 Solo responsabilidad: mostrar opciones y leer entradas del usuario.
-Ninguna lógica de negocio ni acceso a datos aquí.
 """
 from app.controllers.torneo_controller import TorneoController
-from app.views.menu_torneo import MenuTorneo
-from app.views.menu_resultados import MenuResultados
+from app.controllers.inscripcion_controller import InscripcionController
+from app.controllers.fixture_controller import FixtureController
+from app.controllers.resultado_controller import ResultadoController
 
 
 class MenuPrincipal:
@@ -19,19 +19,22 @@ class MenuPrincipal:
 
     def __init__(
         self,
-        torneo_controller: TorneoController,
-        menu_torneo: MenuTorneo,
-        menu_resultados: MenuResultados,
+        torneo_ctrl: TorneoController,
+        inscripcion_ctrl: InscripcionController,
+        fixture_ctrl: FixtureController,
+        resultado_ctrl: ResultadoController,
     ) -> None:
-        self._torneo_controller = torneo_controller
-        self._menu_torneo = menu_torneo
-        self._menu_resultados = menu_resultados
+        from app.views.menu_torneo import MenuTorneo
+        from app.views.menu_resultados import MenuResultados
 
-    def mostrar(self) -> None:
+        self._menu_torneo = MenuTorneo(torneo_ctrl, inscripcion_ctrl, fixture_ctrl)
+        self._menu_resultados = MenuResultados(resultado_ctrl)
+
+    def ejecutar(self) -> None:
         """Bucle principal del menú."""
         print("\n" + "=" * 55)
         print("  🏆  PLATAFORMA DE REGISTRO DE TORNEOS  🏐🏟")
-        print("     Fútbol y Voley  |  Grupo 6 · UTP 2025")
+        print("     Fútbol y Voley  |  Grupo 6 · UTP 2026")
         print("=" * 55)
 
         while True:
