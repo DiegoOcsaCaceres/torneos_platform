@@ -1,9 +1,8 @@
 """
-Repositorio de acceso a datos para la tabla 'torneos' — Neon.tech (psycopg2).
+Repositorio de acceso a datos para las tablas 'Torneo' y 'Deporte' — Neon.tech (psycopg2).
 """
 import logging
 from typing import Optional
-from uuid import UUID
 
 from app.exceptions import RepositorioError, TorneoNoEncontradoError
 from app.models.torneo import Torneo
@@ -13,91 +12,84 @@ logger = logging.getLogger(__name__)
 
 
 class TorneoRepository:
-    """CRUD sobre la tabla 'torneos' usando psycopg2."""
+    """CRUD sobre las tablas 'Torneo' y 'Deporte' usando psycopg2."""
 
-    # ── helpers internos ──────────────────────────────────────────────────
-    @staticmethod
-    def _ejecutar(sql: str, params: tuple = (), fetchone=False, fetchall=False):
-        """Ejecuta una sentencia SQL y retorna el resultado esperado."""
+    def guardar(self, torneo: Torneo) -> dict:
+        """Inserta un nuevo torneo y retorna el registro creado."""
+        sql = """
+            INSERT INTO Torneo (nombre_torneo, fecha_inicio, numero_equipos, id_deporte)
+            VALUES (%s, %s, %s, %s)
+            RETURNING *
+        """
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, params)
-                    if fetchone:
-                        return dict(cur.fetchone()) if cur.rowcount != 0 else None
-                    if fetchall:
-                        rows = cur.fetchall()
-                        return [dict(r) for r in rows]
-                    # Para INSERT ... RETURNING fetchone también aplica
-                    if cur.description:
-                        row = cur.fetchone()
-                        return dict(row) if row else None
-        except Exception as exc:
-            raise exc
-        finally:
-            conn.close()
-
-    # ── operaciones públicas ──────────────────────────────────────────────
-    def guardar(self, torneo: Torneo) -> dict:
-        """Inserta un nuevo torneo y retorna el registro creado."""
-        sql = """
-            INSERT INTO torneos (nombre, tipo_deporte, max_equipos, fecha_inicio, estado)
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING *
-        """
-        try:
-            resultado = self._ejecutar(
-                sql,
-                (torneo.nombre, torneo.tipo_deporte, torneo.max_equipos,
-                 torneo.fecha_inicio, torneo.estado),
-            )
-            return resultado
+                    cur.execute(sql, (
+                        torneo.nombre_torneo,
+                        torneo.fecha_inicio,
+                        torneo.numero_equipos,
+                        torneo.id_deporte,
+                    ))
+                    return dict(cur.fetchone())
         except Exception as exc:
             logger.error("TorneoRepository.guardar -> %s", exc)
             raise RepositorioError("Error interno al crear el torneo.") from exc
+        finally:
+            conn.close()
 
-    def obtener_por_id(self, id_torneo: UUID) -> Optional[dict]:
-        """Busca un torneo por su UUID. Retorna None si no existe."""
-        sql = "SELECT * FROM torneos WHERE id = %s"
+    def obtener_por_id(self, id_torneo: int) -> Optional[dict]:
+        """Busca un torneo por su ID. Retorna None si no existe."""
+        sql = """
+            SELECT t.*, d.nombre_deporte, d.reglas
+            FROM Torneo t
+            JOIN Deporte d ON d.id_deporte = t.id_deporte
+            WHERE t.id_torneo = %s
+        """
+        conn = obtener_conexion()
         try:
-            conn = obtener_conexion()
-            try:
-                with conn:
-                    with conn.cursor() as cur:
-                        cur.execute(sql, (str(id_torneo),))
-                        row = cur.fetchone()
-                        return dict(row) if row else None
-            finally:
-                conn.close()
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo,))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
         except Exception as exc:
             logger.error("TorneoRepository.obtener_por_id -> %s", exc)
             raise RepositorioError("Error al consultar el torneo.") from exc
+        finally:
+            conn.close()
 
     def listar(self) -> list:
-        """Retorna todos los torneos ordenados por fecha de creación."""
-        sql = "SELECT * FROM torneos ORDER BY creado_en DESC"
+        """Retorna todos los torneos con el nombre de su deporte."""
+        sql = """
+            SELECT t.*, d.nombre_deporte
+            FROM Torneo t
+            JOIN Deporte d ON d.id_deporte = t.id_deporte
+            ORDER BY t.id_torneo
+        """
+        conn = obtener_conexion()
         try:
-            return self._ejecutar(sql, fetchall=True) or []
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql)
+                    return [dict(r) for r in cur.fetchall()]
         except Exception as exc:
             logger.error("TorneoRepository.listar -> %s", exc)
             raise RepositorioError("Error al listar los torneos.") from exc
+        finally:
+            conn.close()
 
-    def actualizar_estado(self, id_torneo: UUID, nuevo_estado: str) -> dict:
-        """Actualiza el estado de un torneo existente."""
-        sql = """
-            UPDATE torneos
-            SET estado = %s, actualizado_en = NOW()
-            WHERE id = %s
-            RETURNING *
-        """
+    def listar_deportes(self) -> list:
+        """Retorna todos los deportes disponibles."""
+        sql = "SELECT * FROM Deporte ORDER BY id_deporte"
+        conn = obtener_conexion()
         try:
-            resultado = self._ejecutar(sql, (nuevo_estado, str(id_torneo)))
-            if not resultado:
-                raise TorneoNoEncontradoError(f"Torneo {id_torneo} no encontrado.")
-            return resultado
-        except TorneoNoEncontradoError:
-            raise
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql)
+                    return [dict(r) for r in cur.fetchall()]
         except Exception as exc:
-            logger.error("TorneoRepository.actualizar_estado -> %s", exc)
-            raise RepositorioError("Error al actualizar el estado del torneo.") from exc
+            logger.error("TorneoRepository.listar_deportes -> %s", exc)
+            raise RepositorioError("Error al listar deportes.") from exc
+        finally:
+            conn.close()
