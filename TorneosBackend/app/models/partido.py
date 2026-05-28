@@ -1,34 +1,31 @@
 """
 Modelo de dominio: Partido.
+Adaptado al nuevo schema: id_cancha, id_torneo, hora, estado.
 """
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, time
 from typing import Optional
-from uuid import UUID
 
 
 @dataclass
 class Partido:
     """
-    Representa un enfrentamiento entre dos equipos dentro de un fixture.
+    Representa un partido dentro de un torneo.
 
     Attributes:
-        id_fixture:       UUID del fixture al que pertenece.
-        id_equipo_local:  UUID del equipo local.
-        id_equipo_visita: UUID del equipo visitante.
-        jornada:          Número de la jornada dentro del fixture.
-        fecha:            Fecha programada del partido (opcional).
-        jugado:           True si el partido ya fue disputado.
-        id:               UUID asignado tras la persistencia.
+        id_torneo:  FK al torneo al que pertenece.
+        id_cancha:  FK a la cancha donde se juega.
+        fecha:      Fecha del partido.
+        hora:       Hora del partido.
+        estado:     Estado del partido (ej: 'Pendiente', 'Finalizado').
+        id_partido: ID serial asignado tras la persistencia.
     """
-    id_fixture: UUID
-    id_equipo_local: UUID
-    id_equipo_visita: UUID
-    jornada: int
+    id_torneo: int
+    id_cancha: int
     fecha: Optional[date] = None
-    jugado: bool = False
-    id: Optional[UUID] = None
+    hora: Optional[time] = None
+    estado: str = 'Pendiente'
+    id_partido: Optional[int] = None
 
     def __str__(self) -> str:
-        estado = "✔ Jugado" if self.jugado else "⏳ Pendiente"
-        return f"Jornada {self.jornada} | Local vs Visita | {estado}"
+        return f"Partido #{self.id_partido} | {self.fecha} {self.hora} | {self.estado}"
