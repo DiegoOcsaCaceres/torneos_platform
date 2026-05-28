@@ -1,161 +1,105 @@
 """
-Servicio de registro de resultados y actualización de tabla de posiciones (RF-06, RF-07, RF-08).
+Servicio de registro de resultados y tabla de posiciones.
+Adaptado al nuevo schema: guarda puntaje por Partido_Equipo.
 """
 import logging
-from uuid import UUID
 
 from app.exceptions import ResultadoInvalidoError, RepositorioError
-from app.repositories.resultado_repo import ResultadoRepository
-from app.repositories.equipo_repo import EquipoRepository
-from app.repositories.torneo_repo import TorneoRepository
 from app.factories.torneo_factory import TorneoFactory
+from app.repositories.partido_repo import PartidoRepository
+from app.repositories.resultado_repo import ResultadoRepository
+from app.repositories.torneo_repo import TorneoRepository
 
 logger = logging.getLogger(__name__)
-
-# Mapa de reglas de puntuación por deporte
-_PUNTOS = {
-    'futbol': {'victoria': 3, 'empate': 1, 'derrota': 0},
-    'voley':  {'victoria': 3, 'empate': 0, 'derrota': 0},
-}
 
 
 class ResultadoService:
     """
-    Registra resultados, valida reglas del deporte y actualiza la tabla (RF-06–RF-09).
+    Registra resultados y consulta la tabla de posiciones.
     """
 
     def __init__(
         self,
         resultado_repo: ResultadoRepository,
-        equipo_repo: EquipoRepository,
+        partido_repo: PartidoRepository,
         torneo_repo: TorneoRepository,
     ) -> None:
         self._resultado_repo = resultado_repo
-        self._equipo_repo = equipo_repo
+        self._partido_repo = partido_repo
         self._torneo_repo = torneo_repo
 
     def registrar_resultado(
         self,
-        id_partido: UUID,
-        id_equipo_local: UUID,
-        id_equipo_visita: UUID,
-        id_torneo: UUID,
-        marcador_local: int,
-        marcador_visita: int,
+        id_partido: int,
+        id_partido_equipo_local: int,
+        id_partido_equipo_visita: int,
+        id_torneo: int,
+        puntaje_local: int,
+        puntaje_visita: int,
     ) -> dict:
         """
-        Registra el resultado de un partido con validación de reglas (RF-07).
+        Registra el resultado (puntaje) de ambos equipos en un partido.
 
         Args:
-            id_partido:       UUID del partido.
-            id_equipo_local:  UUID del equipo local.
-            id_equipo_visita: UUID del equipo visitante.
-            id_torneo:        UUID del torneo (para determinar reglas).
-            marcador_local:   Tantos/sets del equipo local.
-            marcador_visita:  Tantos/sets del equipo visitante.
+            id_partido:                 ID del partido.
+            id_partido_equipo_local:    ID del Partido_Equipo del local.
+            id_partido_equipo_visita:   ID del Partido_Equipo del visitante.
+            id_torneo:                  ID del torneo (para validar reglas).
+            puntaje_local:              Goles/sets del equipo local.
+            puntaje_visita:             Goles/sets del equipo visitante.
 
         Returns:
-            dict con los datos del resultado registrado.
+            dict con los dos resultados registrados.
 
         Raises:
             ResultadoInvalidoError: Si el marcador viola las reglas del deporte.
             RepositorioError:       Si falla la persistencia.
         """
         try:
-            # 1. Obtener tipo de deporte del torneo
+            # 1. Obtener tipo de deporte
             torneo = self._torneo_repo.obtener_por_id(id_torneo)
             if not torneo:
                 raise ValueError(f"Torneo {id_torneo} no encontrado.")
-            tipo_deporte = torneo['tipo_deporte']
+
+            nombre_deporte = torneo.get('nombre_deporte', '').lower()
+            tipo_deporte = 'futbol' if 'f' in nombre_deporte else 'voley'
 
             # 2. Validar marcador según reglas del deporte
             torneo_obj = TorneoFactory.crear(
                 tipo_deporte=tipo_deporte,
-                nombre=torneo['nombre'],
-                max_equipos=torneo['max_equipos'],
+                nombre_torneo=torneo['nombre_torneo'],
+                numero_equipos=torneo['numero_equipos'],
                 fecha_inicio=torneo['fecha_inicio'],
+                id_deporte=torneo['id_deporte'],
             )
-            if not torneo_obj.validar_resultado(marcador_local, marcador_visita):
+            if not torneo_obj.validar_resultado(puntaje_local, puntaje_visita):
                 raise ResultadoInvalidoError(
-                    f"El marcador {marcador_local}-{marcador_visita} no es válido "
+                    f"El marcador {puntaje_local}-{puntaje_visita} no es válido "
                     f"para {tipo_deporte}."
                 )
 
-            # 3. Persistir resultado
-            resultado = self._resultado_repo.guardar(
-                id_partido, marcador_local, marcador_visita
-            )
+            # 3. Guardar resultado del local
+            res_local = self._resultado_repo.guardar(puntaje_local, id_partido_equipo_local)
+            # 4. Guardar resultado del visitante
+            res_visita = self._resultado_repo.guardar(puntaje_visita, id_partido_equipo_visita)
 
-            # 4. Calcular puntos y actualizar estadísticas
-            self._actualizar_estadisticas(
-                id_torneo=id_torneo,
-                id_local=id_equipo_local,
-                id_visita=id_equipo_visita,
-                marcador_local=marcador_local,
-                marcador_visita=marcador_visita,
-                tipo_deporte=tipo_deporte,
-                torneo_obj=torneo_obj,
-            )
+            # 5. Marcar partido como Finalizado
+            self._partido_repo.actualizar_estado(id_partido, 'Finalizado')
 
-            return resultado
+            return {'local': res_local, 'visitante': res_visita}
 
         except ResultadoInvalidoError:
             raise
         except Exception as exc:
-            logger.error(
-                'ResultadoService.registrar_resultado -> id=%s │ error=%s',
-                id_partido, exc,
-            )
+            logger.error('ResultadoService.registrar_resultado -> %s', exc)
             raise RepositorioError(
-                "Ocurrió un error técnico al registrar el resultado. Intente de nuevo."
+                "Error técnico al registrar el resultado. Intente de nuevo."
             ) from exc
 
-    def _actualizar_estadisticas(
-        self,
-        id_torneo: UUID,
-        id_local: UUID,
-        id_visita: UUID,
-        marcador_local: int,
-        marcador_visita: int,
-        tipo_deporte: str,
-        torneo_obj,
-    ) -> None:
-        """Calcula puntos y actualiza estadísticas de ambos equipos en la tabla."""
-        reglas = _PUNTOS[tipo_deporte]
+    def ver_marcador(self, id_partido: int) -> list:
+        """Retorna los puntajes de ambos equipos en un partido."""
+        return self._resultado_repo.obtener_marcador_partido(id_partido)
 
-        pts_local = torneo_obj.calcular_puntos(marcador_local, marcador_visita)
-        pts_visita = torneo_obj.calcular_puntos(marcador_visita, marcador_local)
-
-        es_empate = marcador_local == marcador_visita
-
-        stats_local = {
-            'partidos_jugados': 1,
-            'partidos_ganados': 1 if pts_local == reglas['victoria'] else 0,
-            'partidos_empatados': 1 if es_empate else 0,
-            'partidos_perdidos': 1 if pts_local == reglas['derrota'] and not es_empate else 0,
-            'puntos': pts_local,
-        }
-        stats_visita = {
-            'partidos_jugados': 1,
-            'partidos_ganados': 1 if pts_visita == reglas['victoria'] else 0,
-            'partidos_empatados': 1 if es_empate else 0,
-            'partidos_perdidos': 1 if pts_visita == reglas['derrota'] and not es_empate else 0,
-            'puntos': pts_visita,
-        }
-
-        # Actualizar tabla de posiciones
-        for id_equipo, stats in [(id_local, stats_local), (id_visita, stats_visita)]:
-            self._resultado_repo.actualizar_tabla(id_torneo, id_equipo, {
-                'puntos': stats['puntos'],
-                'pg': stats['partidos_ganados'],
-                'pe': stats['partidos_empatados'],
-                'pp': stats['partidos_perdidos'],
-            })
-
-    def ver_tabla(self, id_torneo: UUID) -> list:
+    def ver_tabla(self, id_torneo: int) -> list:
         """Retorna la tabla de posiciones del torneo."""
-        return self._resultado_repo.obtener_tabla(id_torneo)
-
-    def ver_resultado(self, id_partido: UUID) -> dict | None:
-        """Retorna el resultado de un partido específico."""
-        return self._resultado_repo.obtener_por_partido(id_partido)
+        return self._resultado_repo.obtener_tabla_posiciones(id_torneo)
