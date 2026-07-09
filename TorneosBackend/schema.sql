@@ -127,3 +127,19 @@ INSERT INTO Partido_Equipo (id_partido, id_equipo, id_condicion) VALUES
 INSERT INTO Resultado (puntaje, id_partido_equipo) VALUES 
 (3, 1),
 (1, 2);
+
+-- ============================================================
+-- MÓDULO DE AUTENTICACIÓN
+-- ============================================================
+
+CREATE TABLE Usuario (
+    id_usuario SERIAL PRIMARY KEY,
+    nombres VARCHAR(50) NOT NULL,
+    apellido_paterno VARCHAR(50) NOT NULL,
+    apellido_materno VARCHAR(50) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    rol VARCHAR(20) NOT NULL DEFAULT 'ORGANIZADOR',
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_registro TIMESTAMP NOT NULL DEFAULT NOW()
+);
