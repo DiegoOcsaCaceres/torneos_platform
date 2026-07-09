@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL: str = os.environ.get('DATABASE_URL', '')
+JWT_SECRET_KEY: str = os.environ.get('JWT_SECRET_KEY', '')
+JWT_ALGORITHM: str = 'HS256'
+JWT_EXPIRATION_HORAS: int = 24
 
 # ── Constantes de dominio ───────────────────────────────────────────────────
 MAX_EQUIPOS_FUTBOL: int = 10
