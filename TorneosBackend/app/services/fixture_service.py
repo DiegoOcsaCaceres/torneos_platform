@@ -39,6 +39,7 @@ class FixtureService:
         id_torneo: int,
         id_cancha: int,
         fecha_inicio: Optional[date] = None,
+        regenerar: bool = False,
     ) -> list:
         """
         Genera y persiste el fixture round-robin para el torneo.
@@ -47,12 +48,16 @@ class FixtureService:
             id_torneo:    ID del torneo.
             id_cancha:    ID de la cancha donde se jugarán los partidos.
             fecha_inicio: Fecha base opcional para los partidos.
+            regenerar:    Si es True y el fixture existente no tiene partidos
+                          finalizados, lo borra y genera uno nuevo desde cero.
 
         Returns:
             Lista de dicts con los partidos creados.
 
         Raises:
-            FixtureError:     Si hay menos de 2 equipos.
+            FixtureError:     Si hay menos de 2 equipos, si ya existe un
+                               fixture y no se pidió regenerar, o si ya hay
+                               partidos finalizados (no se puede regenerar).
             RepositorioError: Si falla la persistencia.
         """
         equipos = self._equipo_repo.listar_por_torneo(id_torneo)
@@ -60,6 +65,20 @@ class FixtureService:
             raise FixtureError(
                 "Se necesitan al menos 2 equipos para generar el fixture."
             )
+
+        partidos_existentes = self._partido_repo.contar_por_torneo(id_torneo)
+        if partidos_existentes > 0:
+            if not regenerar:
+                raise FixtureError(
+                    "Este torneo ya tiene un fixture generado. "
+                    "Vuelve a intentarlo con regenerar=true si quieres reemplazarlo."
+                )
+            if self._partido_repo.existe_partido_finalizado(id_torneo):
+                raise FixtureError(
+                    "No se puede regenerar el fixture: ya hay partidos con "
+                    "resultados registrados en este torneo."
+                )
+            self._partido_repo.eliminar_por_torneo(id_torneo)
 
         ids_equipos = [e['id_equipo'] for e in equipos]
         rondas = self._round_robin(ids_equipos)
