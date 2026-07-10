@@ -180,3 +180,45 @@ class InscripcionService:
             )
 
         self._equipo_repo.eliminar(id_equipo)
+
+    def actualizar_jugador(
+        self,
+        id_jugador: int,
+        nombre_jugador: str,
+        apellido_paterno: str,
+        apellido_materno: str,
+        dni: str,
+    ) -> dict:
+        """
+        Actualiza los datos de un jugador, validando el DNI si cambió.
+        """
+        nombre_jugador = self._sanitizar(nombre_jugador, max_len=50)
+        apellido_paterno = self._sanitizar(apellido_paterno, max_len=50)
+        apellido_materno = self._sanitizar(apellido_materno, max_len=50)
+        dni = self._sanitizar(dni, max_len=15)
+
+        jugador_actual = self._jugador_repo.obtener_por_id(id_jugador)
+        if not jugador_actual:
+            raise ValueError(f"No existe el jugador con ID: {id_jugador}")
+
+        if dni != jugador_actual['dni'] and self._jugador_repo.existe_dni(dni):
+            raise JugadorDuplicadoError(
+                f"Ya existe un jugador registrado con el DNI '{dni}'."
+            )
+
+        return self._jugador_repo.actualizar(
+            id_jugador=id_jugador,
+            nombre_jugador=nombre_jugador,
+            apellido_paterno=apellido_paterno,
+            apellido_materno=apellido_materno,
+            dni=dni,
+        )
+
+    def eliminar_jugador(self, id_jugador: int) -> None:
+        """Elimina un jugador por su ID."""
+        jugador = self._jugador_repo.obtener_por_id(id_jugador)
+        if not jugador:
+            raise ValueError(f"No existe el jugador con ID: {id_jugador}")
+        self._jugador_repo.eliminar(id_jugador)
+
+    
