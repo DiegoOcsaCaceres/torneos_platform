@@ -29,8 +29,9 @@ class UsuarioDuplicadoError(Exception):
 class CredencialesInvalidasError(Exception):
     """El correo o la contraseña no son correctos."""
 
-class CredencialesInvalidasError(Exception):
-    """El correo o la contraseña no son correctos."""
 
 class JugadorDuplicadoError(Exception):
     """Ya existe un jugador registrado con ese DNI."""
+
+class EquipoConJugadoresError(Exception):
+    """No se puede eliminar el equipo porque tiene jugadores inscritos."""
