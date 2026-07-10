@@ -28,6 +28,7 @@ from app.exceptions import (
     JugadorDuplicadoError,
     EquipoConJugadoresError,
     FixtureError,
+    ResultadoInvalidoError,
 )
 from app.repositories.usuario_repo import UsuarioRepository
 from app.repositories.torneo_repo import TorneoRepository
@@ -44,6 +45,8 @@ from app.services.torneo_service import TorneoService
 from app.services.inscripcion_service import InscripcionService
 from app.services.fixture_service import FixtureService
 from app.repositories.partido_repo import PartidoRepository
+from app.repositories.resultado_repo import ResultadoRepository
+from app.services.resultado_service import ResultadoService
 
 app = FastAPI(title="Canchalibre API", version="1.0.0")
 
@@ -66,6 +69,8 @@ jugador_repo = JugadorRepository()
 cancha_repo = CanchaRepository()
 partido_repo = PartidoRepository()
 fixture_service = FixtureService(partido_repo, equipo_repo)
+resultado_repo = ResultadoRepository()
+resultado_service = ResultadoService(resultado_repo, partido_repo, torneo_repo)
 inscripcion_service = InscripcionService(equipo_repo, torneo_repo, jugador_repo)
 security = HTTPBearer()
 
@@ -119,6 +124,13 @@ class FixtureCreateRequest(BaseModel):
     id_cancha: int
     fecha_inicio: Optional[date] = None
     regenerar: bool = False
+
+class ResultadoCreateRequest(BaseModel):
+    id_partido_equipo_local: int
+    id_partido_equipo_visita: int
+    id_torneo: int
+    puntaje_local: int
+    puntaje_visita: int
 
 # ── Dependencia: extrae y valida el usuario autenticado desde el token ─────
 
@@ -400,5 +412,26 @@ def generar_fixture_endpoint(
 def ver_fixture_endpoint(id_torneo: int):
     try:
         return fixture_service.ver_fixture(id_torneo)
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/partidos/{id_partido}/resultado")
+def registrar_resultado_endpoint(
+    id_partido: int,
+    payload: ResultadoCreateRequest,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        resultado = resultado_service.registrar_resultado(
+            id_partido=id_partido,
+            id_partido_equipo_local=payload.id_partido_equipo_local,
+            id_partido_equipo_visita=payload.id_partido_equipo_visita,
+            id_torneo=payload.id_torneo,
+            puntaje_local=payload.puntaje_local,
+            puntaje_visita=payload.puntaje_visita,
+        )
+        return {"mensaje": "Resultado registrado exitosamente.", "resultado": resultado}
+    except ResultadoInvalidoError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except RepositorioError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
