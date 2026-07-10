@@ -36,6 +36,7 @@ from app.repositories.usuario_repo import UsuarioRepository
 from app.repositories.torneo_repo import TorneoRepository
 from app.repositories.equipo_repo import EquipoRepository
 from app.repositories.jugador_repo import JugadorRepository
+from app.repositories.cancha_repo import CanchaRepository
 from app.services.auth_service import AuthService
 from app.services.torneo_service import TorneoService
 from app.services.inscripcion_service import InscripcionService
@@ -58,6 +59,7 @@ torneo_repo = TorneoRepository()
 torneo_service = TorneoService(torneo_repo)
 equipo_repo = EquipoRepository()
 jugador_repo = JugadorRepository()
+cancha_repo = CanchaRepository()
 inscripcion_service = InscripcionService(equipo_repo, torneo_repo, jugador_repo)
 security = HTTPBearer()
 
@@ -352,5 +354,12 @@ def eliminar_jugador_endpoint(
         return {"mensaje": "Jugador eliminado exitosamente."}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.get("/canchas")
+def listar_canchas_endpoint():
+    try:
+        return cancha_repo.listar()
     except RepositorioError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
