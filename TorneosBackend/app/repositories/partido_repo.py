@@ -143,3 +143,67 @@ class PartidoRepository:
             raise RepositorioError("Error al actualizar estado del partido.") from exc
         finally:
             conn.close()
+
+    def contar_por_torneo(self, id_torneo: int) -> int:
+        """Cuenta los partidos existentes en un torneo."""
+        sql = "SELECT COUNT(*) AS total FROM Partido WHERE id_torneo = %s"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo,))
+                    row = cur.fetchone()
+                    return int(row['total']) if row else 0
+        except Exception as exc:
+            logger.error("PartidoRepository.contar_por_torneo -> %s", exc)
+            raise RepositorioError("Error al contar partidos del torneo.") from exc
+        finally:
+            conn.close()
+
+    def existe_partido_finalizado(self, id_torneo: int) -> bool:
+        """Verifica si el torneo tiene al menos un partido ya finalizado."""
+        sql = "SELECT id_partido FROM Partido WHERE id_torneo = %s AND estado = 'Finalizado' LIMIT 1"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo,))
+                    return cur.fetchone() is not None
+        except Exception as exc:
+            logger.error("PartidoRepository.existe_partido_finalizado -> %s", exc)
+            raise RepositorioError("Error al verificar partidos finalizados.") from exc
+        finally:
+            conn.close()
+
+    def eliminar_por_torneo(self, id_torneo: int) -> None:
+        """
+        Elimina en cascada todos los Resultado, Partido_Equipo y Partido
+        asociados a un torneo. Se usa solo para regenerar un fixture sin
+        resultados registrados todavía.
+        """
+        sql = """
+            DELETE FROM Resultado
+            WHERE id_partido_equipo IN (
+                SELECT pe.id_partido_equipo
+                FROM Partido_Equipo pe
+                JOIN Partido p ON p.id_partido = pe.id_partido
+                WHERE p.id_torneo = %s
+            );
+
+            DELETE FROM Partido_Equipo
+            WHERE id_partido IN (
+                SELECT id_partido FROM Partido WHERE id_torneo = %s
+            );
+
+            DELETE FROM Partido WHERE id_torneo = %s;
+        """
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo, id_torneo, id_torneo))
+        except Exception as exc:
+            logger.error("PartidoRepository.eliminar_por_torneo -> %s", exc)
+            raise RepositorioError("Error al eliminar el fixture anterior del torneo.") from exc
+        finally:
+            conn.close()
