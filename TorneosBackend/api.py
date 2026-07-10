@@ -16,6 +16,7 @@ from app.repositories.usuario_repo import UsuarioRepository
 from app.services.auth_service import AuthService
 
 from datetime import date
+from typing import Optional
 import unicodedata
 
 from app.exceptions import (
@@ -26,6 +27,7 @@ from app.exceptions import (
     EquipoDuplicadoError,
     JugadorDuplicadoError,
     EquipoConJugadoresError,
+    FixtureError,
 )
 from app.repositories.usuario_repo import UsuarioRepository
 from app.repositories.torneo_repo import TorneoRepository
@@ -40,6 +42,8 @@ from app.repositories.cancha_repo import CanchaRepository
 from app.services.auth_service import AuthService
 from app.services.torneo_service import TorneoService
 from app.services.inscripcion_service import InscripcionService
+from app.services.fixture_service import FixtureService
+from app.repositories.partido_repo import PartidoRepository
 
 app = FastAPI(title="Canchalibre API", version="1.0.0")
 
@@ -60,6 +64,8 @@ torneo_service = TorneoService(torneo_repo)
 equipo_repo = EquipoRepository()
 jugador_repo = JugadorRepository()
 cancha_repo = CanchaRepository()
+partido_repo = PartidoRepository()
+fixture_service = FixtureService(partido_repo, equipo_repo)
 inscripcion_service = InscripcionService(equipo_repo, torneo_repo, jugador_repo)
 security = HTTPBearer()
 
@@ -107,6 +113,12 @@ class JugadorUpdateRequest(BaseModel):
     apellido_paterno: str
     apellido_materno: str
     dni: str
+
+
+class FixtureCreateRequest(BaseModel):
+    id_cancha: int
+    fecha_inicio: Optional[date] = None
+    regenerar: bool = False
 
 # ── Dependencia: extrae y valida el usuario autenticado desde el token ─────
 
@@ -361,5 +373,32 @@ def eliminar_jugador_endpoint(
 def listar_canchas_endpoint():
     try:
         return cancha_repo.listar()
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/torneos/{id_torneo}/fixture")
+def generar_fixture_endpoint(
+    id_torneo: int,
+    payload: FixtureCreateRequest,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        partidos = fixture_service.generar_fixture(
+            id_torneo=id_torneo,
+            id_cancha=payload.id_cancha,
+            fecha_inicio=payload.fecha_inicio,
+            regenerar=payload.regenerar,
+        )
+        return {"mensaje": f"Fixture generado con {len(partidos)} partido(s).", "partidos": partidos}
+    except FixtureError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/torneos/{id_torneo}/fixture")
+def ver_fixture_endpoint(id_torneo: int):
+    try:
+        return fixture_service.ver_fixture(id_torneo)
     except RepositorioError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
