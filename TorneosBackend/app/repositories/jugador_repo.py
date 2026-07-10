@@ -2,6 +2,7 @@
 Repositorio de acceso a datos para la tabla 'Jugador' — Neon.tech (psycopg2).
 """
 import logging
+from typing import Optional
 
 from app.exceptions import RepositorioError
 from app.models.jugador import Jugador
@@ -87,3 +88,63 @@ class JugadorRepository:
             raise RepositorioError("Error al contar jugadores del equipo.") from exc
         finally:
             conn.close()
+
+    def obtener_por_id(self, id_jugador: int) -> Optional[dict]:
+        """Busca un jugador por su ID. Retorna None si no existe."""
+        sql = "SELECT * FROM Jugador WHERE id_jugador = %s"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_jugador,))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        except Exception as exc:
+            logger.error("JugadorRepository.obtener_por_id -> %s", exc)
+            raise RepositorioError("Error al consultar el jugador.") from exc
+        finally:
+            conn.close()
+
+    def actualizar(
+        self,
+        id_jugador: int,
+        nombre_jugador: str,
+        apellido_paterno: str,
+        apellido_materno: str,
+        dni: str,
+    ) -> dict:
+        """Actualiza los datos de un jugador."""
+        sql = """
+            UPDATE Jugador
+            SET nombre_jugador = %s, apellido_paterno = %s, apellido_materno = %s, DNI = %s
+            WHERE id_jugador = %s
+            RETURNING *
+        """
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (nombre_jugador, apellido_paterno, apellido_materno, dni, id_jugador))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        except Exception as exc:
+            logger.error("JugadorRepository.actualizar -> %s", exc)
+            raise RepositorioError("Error al actualizar el jugador.") from exc
+        finally:
+            conn.close()
+
+    def eliminar(self, id_jugador: int) -> None:
+        """Elimina un jugador por su ID."""
+        sql = "DELETE FROM Jugador WHERE id_jugador = %s"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_jugador,))
+        except Exception as exc:
+            logger.error("JugadorRepository.eliminar -> %s", exc)
+            raise RepositorioError("Error al eliminar el jugador.") from exc
+        finally:
+            conn.close()
+
+    
