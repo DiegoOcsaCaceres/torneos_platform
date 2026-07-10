@@ -24,6 +24,7 @@ from app.exceptions import (
     RepositorioError,
     TorneoNoEncontradoError,
     EquipoDuplicadoError,
+    JugadorDuplicadoError,
 )
 from app.repositories.usuario_repo import UsuarioRepository
 from app.repositories.torneo_repo import TorneoRepository
@@ -33,6 +34,7 @@ from app.services.torneo_service import TorneoService
 from app.repositories.usuario_repo import UsuarioRepository
 from app.repositories.torneo_repo import TorneoRepository
 from app.repositories.equipo_repo import EquipoRepository
+from app.repositories.jugador_repo import JugadorRepository
 from app.services.auth_service import AuthService
 from app.services.torneo_service import TorneoService
 from app.services.inscripcion_service import InscripcionService
@@ -54,7 +56,8 @@ auth_service = AuthService(usuario_repo)
 torneo_repo = TorneoRepository()
 torneo_service = TorneoService(torneo_repo)
 equipo_repo = EquipoRepository()
-inscripcion_service = InscripcionService(equipo_repo, torneo_repo)
+jugador_repo = JugadorRepository()
+inscripcion_service = InscripcionService(equipo_repo, torneo_repo, jugador_repo)
 security = HTTPBearer()
 
 
@@ -83,6 +86,12 @@ class TorneoCreateRequest(BaseModel):
 class EquipoCreateRequest(BaseModel):
     nombre_equipo: str
     numero_jugadores: int
+
+class JugadorCreateRequest(BaseModel):
+    nombre_jugador: str
+    apellido_paterno: str
+    apellido_materno: str
+    dni: str
 
 # ── Dependencia: extrae y valida el usuario autenticado desde el token ─────
 
@@ -228,5 +237,35 @@ def inscribir_equipo_endpoint(
 def listar_equipos_endpoint(id_torneo: int):
     try:
         return inscripcion_service.listar_equipos(id_torneo)
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/equipos/{id_equipo}/jugadores")
+def inscribir_jugador_endpoint(
+    id_equipo: int,
+    payload: JugadorCreateRequest,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        jugador = inscripcion_service.inscribir_jugador(
+            nombre_jugador=payload.nombre_jugador,
+            apellido_paterno=payload.apellido_paterno,
+            apellido_materno=payload.apellido_materno,
+            dni=payload.dni,
+            id_equipo=id_equipo,
+        )
+        return {"mensaje": f"Jugador '{jugador['nombre_jugador']}' inscrito exitosamente.", "jugador": jugador}
+    except JugadorDuplicadoError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/equipos/{id_equipo}/jugadores")
+def listar_jugadores_endpoint(id_equipo: int):
+    try:
+        return inscripcion_service.listar_jugadores(id_equipo)
     except RepositorioError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
