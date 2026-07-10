@@ -25,6 +25,7 @@ from app.exceptions import (
     TorneoNoEncontradoError,
     EquipoDuplicadoError,
     JugadorDuplicadoError,
+    EquipoConJugadoresError,
 )
 from app.repositories.usuario_repo import UsuarioRepository
 from app.repositories.torneo_repo import TorneoRepository
@@ -92,6 +93,11 @@ class JugadorCreateRequest(BaseModel):
     apellido_paterno: str
     apellido_materno: str
     dni: str
+
+
+class EquipoUpdateRequest(BaseModel):
+    nombre_equipo: str
+    id_torneo: int
 
 # ── Dependencia: extrae y valida el usuario autenticado desde el token ─────
 
@@ -267,5 +273,41 @@ def inscribir_jugador_endpoint(
 def listar_jugadores_endpoint(id_equipo: int):
     try:
         return inscripcion_service.listar_jugadores(id_equipo)
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.put("/equipos/{id_equipo}")
+def actualizar_equipo_endpoint(
+    id_equipo: int,
+    payload: EquipoUpdateRequest,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        equipo = inscripcion_service.actualizar_equipo(
+            id_equipo=id_equipo,
+            nombre_equipo=payload.nombre_equipo,
+            id_torneo=payload.id_torneo,
+        )
+        return {"mensaje": f"Equipo actualizado a '{equipo['nombre_equipo']}'.", "equipo": equipo}
+    except EquipoDuplicadoError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.delete("/equipos/{id_equipo}")
+def eliminar_equipo_endpoint(
+    id_equipo: int,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        inscripcion_service.eliminar_equipo(id_equipo)
+        return {"mensaje": "Equipo eliminado exitosamente."}
+    except EquipoConJugadoresError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except RepositorioError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
