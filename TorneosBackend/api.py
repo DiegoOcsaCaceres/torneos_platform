@@ -15,6 +15,20 @@ from app.exceptions import (
 from app.repositories.usuario_repo import UsuarioRepository
 from app.services.auth_service import AuthService
 
+from datetime import date
+import unicodedata
+
+from app.exceptions import (
+    UsuarioDuplicadoError,
+    CredencialesInvalidasError,
+    RepositorioError,
+    TorneoNoEncontradoError,
+)
+from app.repositories.usuario_repo import UsuarioRepository
+from app.repositories.torneo_repo import TorneoRepository
+from app.services.auth_service import AuthService
+from app.services.torneo_service import TorneoService
+
 app = FastAPI(title="Canchalibre API", version="1.0.0")
 
 # ── CORS: permite que el frontend (Vite, puerto 5173) le hable a esta API ──
@@ -29,7 +43,8 @@ app.add_middleware(
 # ── Inyección manual de dependencias (repo -> service) ──────────────────────
 usuario_repo = UsuarioRepository()
 auth_service = AuthService(usuario_repo)
-
+torneo_repo = TorneoRepository()
+torneo_service = TorneoService(torneo_repo)
 security = HTTPBearer()
 
 
@@ -48,6 +63,12 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class TorneoCreateRequest(BaseModel):
+    tipo_deporte: str        # 'futbol' o 'voley'
+    nombre_torneo: str
+    numero_equipos: int
+    fecha_inicio: date
+
 # ── Dependencia: extrae y valida el usuario autenticado desde el token ─────
 
 def obtener_usuario_actual(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
@@ -57,6 +78,26 @@ def obtener_usuario_actual(credentials: HTTPAuthorizationCredentials = Depends(s
     except CredencialesInvalidasError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
 
+
+def _quitar_tildes(texto: str) -> str:
+    """Normaliza texto quitando tildes, para comparar 'Vóley' con 'voley'."""
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    ).lower()
+
+
+def _resolver_id_deporte(tipo_deporte: str) -> int:
+    """
+    Busca en la tabla Deporte el id_deporte correspondiente a 'futbol' o 'voley',
+    para que el frontend no necesite conocer los IDs numéricos de la BD.
+    """
+    tipo_normalizado = _quitar_tildes(tipo_deporte.strip())
+    deportes = torneo_service.listar_deportes()
+    for deporte in deportes:
+        if _quitar_tildes(deporte['nombre_deporte']).startswith(tipo_normalizado):
+            return deporte['id_deporte']
+    raise ValueError(f"No se encontró el deporte '{tipo_deporte}' en la base de datos.")
 
 # ── Endpoints ────────────────────────────────────────────────────────────
 
@@ -99,3 +140,50 @@ def login(payload: LoginRequest):
 def yo(usuario_actual: dict = Depends(obtener_usuario_actual)):
     """Retorna los datos del usuario autenticado según su token. Sirve para validar sesión."""
     return usuario_actual
+
+
+@app.get("/torneos/deportes")
+def listar_deportes_endpoint():
+    try:
+        return torneo_service.listar_deportes()
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/torneos")
+def crear_torneo_endpoint(
+    payload: TorneoCreateRequest,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        id_deporte = _resolver_id_deporte(payload.tipo_deporte)
+        torneo = torneo_service.crear_torneo(
+            tipo_deporte=payload.tipo_deporte,
+            nombre_torneo=payload.nombre_torneo,
+            numero_equipos=payload.numero_equipos,
+            fecha_inicio=payload.fecha_inicio,
+            id_deporte=id_deporte,
+        )
+        return {"mensaje": "Torneo creado exitosamente.", "torneo": torneo}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/torneos")
+def listar_torneos_endpoint():
+    try:
+        return torneo_service.listar_torneos()
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/torneos/{id_torneo}")
+def obtener_torneo_endpoint(id_torneo: int):
+    try:
+        return torneo_service.obtener_torneo(id_torneo)
+    except TorneoNoEncontradoError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
