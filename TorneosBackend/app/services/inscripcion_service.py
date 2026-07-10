@@ -4,7 +4,7 @@ Servicio de lógica de negocio para la inscripción de equipos.
 import html
 import re
 
-from app.exceptions import EquipoDuplicadoError, JugadorDuplicadoError
+from app.exceptions import EquipoDuplicadoError, JugadorDuplicadoError, EquipoConJugadoresError
 from app.models.equipo import Equipo
 from app.models.jugador import Jugador
 from app.repositories.equipo_repo import EquipoRepository
@@ -143,3 +143,40 @@ class InscripcionService:
     def listar_jugadores(self, id_equipo: int) -> list:
         """Retorna todos los jugadores de un equipo."""
         return self._jugador_repo.listar_por_equipo(id_equipo)
+
+    def actualizar_equipo(self, id_equipo: int, nombre_equipo: str, id_torneo: int) -> dict:
+        """
+        Renombra un equipo, validando que el nuevo nombre no choque con otro
+        equipo ya existente en el mismo torneo.
+        """
+        nombre_equipo = self._sanitizar(nombre_equipo)
+
+        equipo_actual = self._equipo_repo.obtener_por_id(id_equipo)
+        if not equipo_actual:
+            raise ValueError(f"No existe el equipo con ID: {id_equipo}")
+
+        if self._equipo_repo.existe_en_torneo(nombre_equipo, id_torneo) and \
+           nombre_equipo.lower() != equipo_actual['nombre_equipo'].lower():
+            raise EquipoDuplicadoError(
+                f"El equipo '{nombre_equipo}' ya está inscrito en este torneo."
+            )
+
+        return self._equipo_repo.actualizar_nombre(id_equipo, nombre_equipo)
+
+    def eliminar_equipo(self, id_equipo: int) -> None:
+        """
+        Elimina un equipo, siempre que no tenga jugadores inscritos.
+        """
+        equipo = self._equipo_repo.obtener_por_id(id_equipo)
+        if not equipo:
+            raise ValueError(f"No existe el equipo con ID: {id_equipo}")
+
+        total_jugadores = self._jugador_repo.contar_por_equipo(id_equipo)
+        if total_jugadores > 0:
+            raise EquipoConJugadoresError(
+                f"No se puede eliminar el equipo '{equipo['nombre_equipo']}' "
+                f"porque tiene {total_jugadores} jugador(es) inscrito(s). "
+                "Elimina primero a los jugadores."
+            )
+
+        self._equipo_repo.eliminar(id_equipo)
