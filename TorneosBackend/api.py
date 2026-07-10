@@ -23,11 +23,19 @@ from app.exceptions import (
     CredencialesInvalidasError,
     RepositorioError,
     TorneoNoEncontradoError,
+    EquipoDuplicadoError,
 )
 from app.repositories.usuario_repo import UsuarioRepository
 from app.repositories.torneo_repo import TorneoRepository
 from app.services.auth_service import AuthService
 from app.services.torneo_service import TorneoService
+
+from app.repositories.usuario_repo import UsuarioRepository
+from app.repositories.torneo_repo import TorneoRepository
+from app.repositories.equipo_repo import EquipoRepository
+from app.services.auth_service import AuthService
+from app.services.torneo_service import TorneoService
+from app.services.inscripcion_service import InscripcionService
 
 app = FastAPI(title="Canchalibre API", version="1.0.0")
 
@@ -45,6 +53,8 @@ usuario_repo = UsuarioRepository()
 auth_service = AuthService(usuario_repo)
 torneo_repo = TorneoRepository()
 torneo_service = TorneoService(torneo_repo)
+equipo_repo = EquipoRepository()
+inscripcion_service = InscripcionService(equipo_repo, torneo_repo)
 security = HTTPBearer()
 
 
@@ -68,6 +78,11 @@ class TorneoCreateRequest(BaseModel):
     nombre_torneo: str
     numero_equipos: int
     fecha_inicio: date
+
+
+class EquipoCreateRequest(BaseModel):
+    nombre_equipo: str
+    numero_jugadores: int
 
 # ── Dependencia: extrae y valida el usuario autenticado desde el token ─────
 
@@ -185,5 +200,33 @@ def obtener_torneo_endpoint(id_torneo: int):
         return torneo_service.obtener_torneo(id_torneo)
     except TorneoNoEncontradoError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/torneos/{id_torneo}/equipos")
+def inscribir_equipo_endpoint(
+    id_torneo: int,
+    payload: EquipoCreateRequest,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        equipo = inscripcion_service.inscribir_equipo(
+            nombre_equipo=payload.nombre_equipo,
+            numero_jugadores=payload.numero_jugadores,
+            id_torneo=id_torneo,
+        )
+        return {"mensaje": f"Equipo '{equipo['nombre_equipo']}' inscrito exitosamente.", "equipo": equipo}
+    except EquipoDuplicadoError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/torneos/{id_torneo}/equipos")
+def listar_equipos_endpoint(id_torneo: int):
+    try:
+        return inscripcion_service.listar_equipos(id_torneo)
     except RepositorioError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
