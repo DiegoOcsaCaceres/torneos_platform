@@ -97,3 +97,17 @@ class UsuarioRepository:
             raise RepositorioError("Error al consultar el usuario.") from exc
         finally:
             conn.close()
+
+    def actualizar_password(self, id_usuario: int, nuevo_password_hash: str) -> None:
+        """Actualiza el hash de contraseña de un usuario."""
+        sql = "UPDATE Usuario SET password_hash = %s WHERE id_usuario = %s"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (nuevo_password_hash, id_usuario))
+        except Exception as exc:
+            logger.error("UsuarioRepository.actualizar_password -> %s", exc)
+            raise RepositorioError("Error al actualizar la contraseña.") from exc
+        finally:
+            conn.close()
