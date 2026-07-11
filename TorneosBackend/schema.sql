@@ -56,6 +56,7 @@ CREATE TABLE Partido (
     estado VARCHAR(20),
     id_cancha INT,
     id_torneo INT,
+    fase VARCHAR(30),
     FOREIGN KEY (id_cancha) REFERENCES Cancha(id_cancha),
     FOREIGN KEY (id_torneo) REFERENCES Torneo(id_torneo)
 );
@@ -74,6 +75,8 @@ CREATE TABLE Resultado (
     id_resultado SERIAL PRIMARY KEY,
     puntaje INT,
     id_partido_equipo INT,
+    penales_local INT,
+    penales_visita INT,
     FOREIGN KEY (id_partido_equipo) REFERENCES Partido_Equipo(id_partido_equipo)
 );
 
