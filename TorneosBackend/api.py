@@ -99,6 +99,7 @@ class TorneoCreateRequest(BaseModel):
     nombre_torneo: str
     numero_equipos: int
     fecha_inicio: date
+    formato: str = 'liga'    # 'liga' o 'eliminacion_directa'
 
 
 class EquipoCreateRequest(BaseModel):
@@ -250,6 +251,7 @@ def crear_torneo_endpoint(
             numero_equipos=payload.numero_equipos,
             fecha_inicio=payload.fecha_inicio,
             id_deporte=id_deporte,
+            formato=payload.formato,
         )
         return {"mensaje": "Torneo creado exitosamente.", "torneo": torneo}
     except ValueError as exc:
