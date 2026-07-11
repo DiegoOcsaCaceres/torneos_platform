@@ -3,6 +3,7 @@ Servicio de registro de resultados y tabla de posiciones.
 Adaptado al nuevo schema: guarda puntaje por Partido_Equipo.
 """
 import logging
+from typing import Optional
 
 from app.exceptions import ResultadoInvalidoError, RepositorioError
 from app.factories.torneo_factory import TorneoFactory
@@ -36,6 +37,8 @@ class ResultadoService:
         id_torneo: int,
         puntaje_local: int,
         puntaje_visita: int,
+        penales_local: Optional[int] = None,
+        penales_visita: Optional[int] = None,
     ) -> dict:
         """
         Registra el resultado (puntaje) de ambos equipos en un partido.
@@ -47,6 +50,10 @@ class ResultadoService:
             id_torneo:                  ID del torneo (para validar reglas).
             puntaje_local:              Goles/sets del equipo local.
             puntaje_visita:             Goles/sets del equipo visitante.
+            penales_local:              Goles de penales del local, solo si hubo
+                                         empate en Torneo Relámpago. None en Liga.
+            penales_visita:             Goles de penales del visitante, en las
+                                         mismas condiciones que penales_local.
 
         Returns:
             dict con los dos resultados registrados.
@@ -79,9 +86,13 @@ class ResultadoService:
                 )
 
             # 3. Guardar resultado del local
-            res_local = self._resultado_repo.guardar(puntaje_local, id_partido_equipo_local)
+            res_local = self._resultado_repo.guardar(
+                puntaje_local, id_partido_equipo_local, penales=penales_local, es_local=True
+            )
             # 4. Guardar resultado del visitante
-            res_visita = self._resultado_repo.guardar(puntaje_visita, id_partido_equipo_visita)
+            res_visita = self._resultado_repo.guardar(
+                puntaje_visita, id_partido_equipo_visita, penales=penales_visita, es_local=False
+            )
 
             # 5. Marcar partido como Finalizado
             self._partido_repo.actualizar_estado(id_partido, 'Finalizado')
