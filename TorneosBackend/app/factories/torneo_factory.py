@@ -19,6 +19,7 @@ class TorneoFactory:
         numero_equipos: int,
         fecha_inicio: date,
         id_deporte: int,
+        formato: str = 'liga',
     ):
         """
         Valida los parámetros y retorna una instancia de TorneoFutbol o TorneoVoley.
@@ -53,11 +54,18 @@ class TorneoFactory:
                 f"El número de equipos debe estar entre {MIN_EQUIPOS} y {max_e}."
             )
 
+        if formato not in ('liga', 'eliminacion_directa'):
+            raise ValueError(
+                f"Formato de torneo inválido: '{formato}'. "
+                "Opciones: 'liga' o 'eliminacion_directa'."
+            )
+
         kwargs = dict(
             nombre_torneo=nombre_torneo,
             fecha_inicio=fecha_inicio,
             numero_equipos=numero_equipos,
             id_deporte=id_deporte,
+            formato=formato,
         )
 
         if tipo == 'futbol':
