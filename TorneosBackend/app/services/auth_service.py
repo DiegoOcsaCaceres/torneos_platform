@@ -76,6 +76,30 @@ class AuthService:
         )
         return self._usuario_repo.guardar(usuario)
 
+    # ── Cambio de contraseña ─────────────────────────────────────────────
+
+    def cambiar_password(self, email: str, password_actual: str, password_nueva: str) -> None:
+        """
+        Verifica la contraseña actual y, si es correcta, la reemplaza por la nueva.
+
+        Raises:
+            CredencialesInvalidasError: Si la contraseña actual no coincide.
+            ValueError:                 Si la nueva contraseña es inválida.
+            RepositorioError:           Si falla la persistencia.
+        """
+        usuario_row = self._usuario_repo.obtener_por_email(email)
+        if not usuario_row:
+            raise CredencialesInvalidasError("Usuario no encontrado.")
+
+        if not self._verificar_password(password_actual, usuario_row['password_hash']):
+            raise CredencialesInvalidasError("La contraseña actual no es correcta.")
+
+        if not password_nueva or len(password_nueva) < 6:
+            raise ValueError("La nueva contraseña debe tener al menos 6 caracteres.")
+
+        nuevo_hash = self._hashear_password(password_nueva)
+        self._usuario_repo.actualizar_password(usuario_row['id_usuario'], nuevo_hash)
+
     # ── Login ────────────────────────────────────────────────────────────
 
     def login(self, email: str, password: str) -> dict:
