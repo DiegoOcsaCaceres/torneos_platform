@@ -135,6 +135,8 @@ class ResultadoCreateRequest(BaseModel):
     id_torneo: int
     puntaje_local: int
     puntaje_visita: int
+    penales_local: Optional[int] = None
+    penales_visita: Optional[int] = None
 
 # ── Dependencia: extrae y valida el usuario autenticado desde el token ─────
 
@@ -466,6 +468,8 @@ def registrar_resultado_endpoint(
             id_torneo=payload.id_torneo,
             puntaje_local=payload.puntaje_local,
             puntaje_visita=payload.puntaje_visita,
+            penales_local=payload.penales_local,
+            penales_visita=payload.penales_visita,
         )
         return {"mensaje": "Resultado registrado exitosamente.", "resultado": resultado}
     except ResultadoInvalidoError as exc:
