@@ -17,6 +17,7 @@ CREATE TABLE Torneo (
     fecha_inicio DATE,
     numero_equipos INT,
     id_deporte INT,
+    formato VARCHAR(20) DEFAULT 'liga',
     FOREIGN KEY (id_deporte) REFERENCES Deporte(id_deporte)
 );
 
