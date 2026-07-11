@@ -93,3 +93,17 @@ class TorneoRepository:
             raise RepositorioError("Error al listar deportes.") from exc
         finally:
             conn.close()
+
+    def eliminar(self, id_torneo: int) -> None:
+        """Elimina un torneo por su ID."""
+        sql = "DELETE FROM Torneo WHERE id_torneo = %s"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo,))
+        except Exception as exc:
+            logger.error("TorneoRepository.eliminar -> %s", exc)
+            raise RepositorioError("Error al eliminar el torneo.") from exc
+        finally:
+            conn.close()
