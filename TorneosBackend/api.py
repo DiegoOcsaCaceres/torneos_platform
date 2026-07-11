@@ -476,3 +476,10 @@ def registrar_resultado_endpoint(
         raise HTTPException(status_code=400, detail=str(exc))
     except RepositorioError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+@app.get("/partidos/{id_partido}/marcador")
+def ver_marcador_endpoint(id_partido: int):
+    try:
+        return resultado_service.ver_marcador(id_partido)
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
