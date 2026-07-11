@@ -13,13 +13,25 @@ logger = logging.getLogger(__name__)
 class ResultadoRepository:
     """CRUD sobre la tabla 'Resultado' usando psycopg2."""
 
-    def guardar(self, puntaje: int, id_partido_equipo: int, penales: Optional[int] = None) -> dict:
+    def guardar(
+        self,
+        puntaje: int,
+        id_partido_equipo: int,
+        penales: Optional[int] = None,
+        es_local: bool = True,
+    ) -> dict:
         """
         Persiste el puntaje de un equipo en un partido.
 
         El parámetro `penales` solo se usa en Torneo Relámpago, cuando el
         partido se definió por tanda de penales. En Liga siempre queda None.
+        `es_local` indica en cuál de las dos columnas (penales_local o
+        penales_visita) debe guardarse ese valor — cada fila de Resultado
+        corresponde a un solo equipo, nunca a los dos a la vez.
         """
+        penales_local = penales if es_local else None
+        penales_visita = penales if not es_local else None
+
         sql = """
             INSERT INTO Resultado (puntaje, id_partido_equipo, penales_local, penales_visita)
             VALUES (%s, %s, %s, %s)
@@ -29,10 +41,7 @@ class ResultadoRepository:
         try:
             with conn:
                 with conn.cursor() as cur:
-                    # El mismo valor de penales se guarda tanto en penales_local como
-                    # en penales_visita para esta fila; se resuelve cuál corresponde
-                    # a cada lado al leer el marcador (ver obtener_marcador_partido).
-                    cur.execute(sql, (puntaje, id_partido_equipo, penales, penales))
+                    cur.execute(sql, (puntaje, id_partido_equipo, penales_local, penales_visita))
                     return dict(cur.fetchone())
         except Exception as exc:
             logger.error("ResultadoRepository.guardar -> %s", exc)
