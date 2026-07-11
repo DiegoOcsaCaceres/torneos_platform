@@ -35,3 +35,6 @@ class JugadorDuplicadoError(Exception):
 
 class EquipoConJugadoresError(Exception):
     """No se puede eliminar el equipo porque tiene jugadores inscritos."""
+
+class TorneoConEquiposError(Exception):
+    """No se puede eliminar el torneo porque tiene equipos inscritos."""
