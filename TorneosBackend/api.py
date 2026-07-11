@@ -24,6 +24,7 @@ from app.exceptions import (
     CredencialesInvalidasError,
     RepositorioError,
     TorneoNoEncontradoError,
+    TorneoConEquiposError,
     EquipoDuplicadoError,
     JugadorDuplicadoError,
     EquipoConJugadoresError,
@@ -248,6 +249,21 @@ def obtener_torneo_endpoint(id_torneo: int):
         return torneo_service.obtener_torneo(id_torneo)
     except TorneoNoEncontradoError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.delete("/torneos/{id_torneo}")
+def eliminar_torneo_endpoint(
+    id_torneo: int,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        torneo_service.eliminar_torneo(id_torneo)
+        return {"mensaje": "Torneo eliminado exitosamente."}
+    except TorneoNoEncontradoError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except TorneoConEquiposError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     except RepositorioError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
