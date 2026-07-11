@@ -17,8 +17,8 @@ class TorneoRepository:
     def guardar(self, torneo: Torneo) -> dict:
         """Inserta un nuevo torneo y retorna el registro creado."""
         sql = """
-            INSERT INTO Torneo (nombre_torneo, fecha_inicio, numero_equipos, id_deporte)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO Torneo (nombre_torneo, fecha_inicio, numero_equipos, id_deporte, formato)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING *
         """
         conn = obtener_conexion()
@@ -30,6 +30,7 @@ class TorneoRepository:
                         torneo.fecha_inicio,
                         torneo.numero_equipos,
                         torneo.id_deporte,
+                        torneo.formato,
                     ))
                     return dict(cur.fetchone())
         except Exception as exc:
