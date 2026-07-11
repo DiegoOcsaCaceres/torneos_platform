@@ -130,6 +130,11 @@ class FixtureCreateRequest(BaseModel):
     fecha_inicio: Optional[date] = None
     regenerar: bool = False
 
+
+class BracketCreateRequest(BaseModel):
+    id_cancha: int
+    fecha_inicio: Optional[date] = None
+
 class ResultadoCreateRequest(BaseModel):
     id_partido_equipo_local: int
     id_partido_equipo_visita: int
@@ -483,5 +488,23 @@ def registrar_resultado_endpoint(
 def ver_marcador_endpoint(id_partido: int):
     try:
         return resultado_service.ver_marcador(id_partido)
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/torneos/{id_torneo}/bracket")
+def generar_bracket_endpoint(
+    id_torneo: int,
+    payload: BracketCreateRequest,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        partidos = fixture_service.generar_bracket_inicial(
+            id_torneo=id_torneo,
+            id_cancha=payload.id_cancha,
+            fecha_inicio=payload.fecha_inicio,
+        )
+        return {"mensaje": f"Bracket generado con {len(partidos)} partido(s).", "partidos": partidos}
+    except FixtureError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     except RepositorioError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
