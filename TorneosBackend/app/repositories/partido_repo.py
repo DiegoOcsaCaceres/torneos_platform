@@ -18,8 +18,8 @@ class PartidoRepository:
     def guardar_partido(self, partido: Partido) -> dict:
         """Persiste un partido y retorna el registro creado."""
         sql = """
-            INSERT INTO Partido (fecha, hora, estado, id_cancha, id_torneo)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO Partido (fecha, hora, estado, id_cancha, id_torneo, fase)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING *
         """
         conn = obtener_conexion()
@@ -32,6 +32,7 @@ class PartidoRepository:
                         partido.estado,
                         partido.id_cancha,
                         partido.id_torneo,
+                        partido.fase,
                     ))
                     return dict(cur.fetchone())
         except Exception as exc:
