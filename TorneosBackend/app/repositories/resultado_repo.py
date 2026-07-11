@@ -74,6 +74,8 @@ class ResultadoRepository:
             SELECT
                 r.id_resultado,
                 r.puntaje,
+                r.penales_local,
+                r.penales_visita,
                 e.nombre_equipo,
                 c.nombre_condicion,
                 pe.id_partido_equipo
