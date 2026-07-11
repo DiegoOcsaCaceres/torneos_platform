@@ -508,3 +508,33 @@ def generar_bracket_endpoint(
         raise HTTPException(status_code=409, detail=str(exc))
     except RepositorioError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/torneos/{id_torneo}/bracket/siguiente-ronda")
+def avanzar_ronda_endpoint(
+    id_torneo: int,
+    payload: BracketCreateRequest,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        resultado = fixture_service.generar_siguiente_ronda(
+            id_torneo=id_torneo,
+            id_cancha=payload.id_cancha,
+            fecha_inicio=payload.fecha_inicio,
+        )
+        if resultado['finalizado']:
+            return {
+                "mensaje": f"¡Torneo finalizado! Campeón: {resultado['campeon']['nombre_equipo']}.",
+                "finalizado": True,
+                "campeon": resultado['campeon'],
+                "partidos": [],
+            }
+        return {
+            "mensaje": f"Siguiente ronda generada con {len(resultado['partidos'])} partido(s).",
+            "finalizado": False,
+            "campeon": None,
+            "partidos": resultado['partidos'],
+        }
+    except FixtureError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
