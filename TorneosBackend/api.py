@@ -90,6 +90,9 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class CambiarPasswordRequest(BaseModel):
+    password_actual: str
+    password_nueva: str
 
 class TorneoCreateRequest(BaseModel):
     tipo_deporte: str        # 'futbol' o 'voley'
@@ -205,6 +208,24 @@ def yo(usuario_actual: dict = Depends(obtener_usuario_actual)):
     """Retorna los datos del usuario autenticado según su token. Sirve para validar sesión."""
     return usuario_actual
 
+@app.put("/auth/cambiar-password")
+def cambiar_password(
+    payload: CambiarPasswordRequest,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        auth_service.cambiar_password(
+            email=usuario_actual["email"],
+            password_actual=payload.password_actual,
+            password_nueva=payload.password_nueva,
+        )
+        return {"mensaje": "Contraseña actualizada exitosamente."}
+    except CredencialesInvalidasError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @app.get("/torneos/deportes")
 def listar_deportes_endpoint():
