@@ -1,6 +1,6 @@
 """
 Modelo de dominio: Partido.
-Adaptado al nuevo schema: id_cancha, id_torneo, hora, estado.
+Adaptado al nuevo schema: id_cancha, id_torneo, hora, estado, fase.
 """
 from dataclasses import dataclass
 from datetime import date, time
@@ -18,6 +18,8 @@ class Partido:
         fecha:      Fecha del partido.
         hora:       Hora del partido.
         estado:     Estado del partido (ej: 'Pendiente', 'Finalizado').
+        fase:       Ronda del partido en Torneo Relámpago (ej: 'Cuartos de Final',
+                    'Semifinal', 'Gran Final'). None en torneos tipo Liga.
         id_partido: ID serial asignado tras la persistencia.
     """
     id_torneo: int
@@ -25,7 +27,9 @@ class Partido:
     fecha: Optional[date] = None
     hora: Optional[time] = None
     estado: str = 'Pendiente'
+    fase: Optional[str] = None
     id_partido: Optional[int] = None
 
     def __str__(self) -> str:
-        return f"Partido #{self.id_partido} | {self.fecha} {self.hora} | {self.estado}"
+        fase_str = f" | {self.fase}" if self.fase else ""
+        return f"Partido #{self.id_partido} | {self.fecha} {self.hora} | {self.estado}{fase_str}"
