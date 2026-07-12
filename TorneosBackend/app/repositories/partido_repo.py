@@ -79,7 +79,9 @@ class PartidoRepository:
                 pe_local.id_partido_equipo  AS id_pe_local,
                 pe_visit.id_partido_equipo  AS id_pe_visitante,
                 r_local.puntaje  AS puntaje_local,
-                r_visit.puntaje  AS puntaje_visita
+                r_visit.puntaje  AS puntaje_visita,
+                r_local.penales_local  AS penales_local,
+                r_visit.penales_visita  AS penales_visita
             FROM Partido p
             JOIN Partido_Equipo pe_local  ON pe_local.id_partido  = p.id_partido
                                          AND pe_local.id_condicion = 1
