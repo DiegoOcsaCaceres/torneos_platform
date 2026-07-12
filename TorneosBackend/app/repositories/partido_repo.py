@@ -18,8 +18,8 @@ class PartidoRepository:
     def guardar_partido(self, partido: Partido) -> dict:
         """Persiste un partido y retorna el registro creado."""
         sql = """
-            INSERT INTO Partido (fecha, hora, estado, id_cancha, id_torneo)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO Partido (fecha, hora, estado, id_cancha, id_torneo, fase)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING *
         """
         conn = obtener_conexion()
@@ -32,6 +32,7 @@ class PartidoRepository:
                         partido.estado,
                         partido.id_cancha,
                         partido.id_torneo,
+                        partido.fase,
                     ))
                     return dict(cur.fetchone())
         except Exception as exc:
@@ -72,19 +73,26 @@ class PartidoRepository:
                 p.estado,
                 p.id_cancha,
                 p.id_torneo,
+                p.fase,
                 e_local.nombre_equipo  AS equipo_local,
                 e_visit.nombre_equipo  AS equipo_visitante,
                 pe_local.id_partido_equipo  AS id_pe_local,
-                pe_visit.id_partido_equipo  AS id_pe_visitante
+                pe_visit.id_partido_equipo  AS id_pe_visitante,
+                r_local.puntaje  AS puntaje_local,
+                r_visit.puntaje  AS puntaje_visita,
+                r_local.penales_local  AS penales_local,
+                r_visit.penales_visita  AS penales_visita
             FROM Partido p
             JOIN Partido_Equipo pe_local  ON pe_local.id_partido  = p.id_partido
                                          AND pe_local.id_condicion = 1
-            JOIN Partido_Equipo pe_visit  ON pe_visit.id_partido  = p.id_partido
-                                         AND pe_visit.id_condicion = 2
+            LEFT JOIN Partido_Equipo pe_visit  ON pe_visit.id_partido  = p.id_partido
+                                              AND pe_visit.id_condicion = 2
             JOIN Equipo e_local   ON e_local.id_equipo  = pe_local.id_equipo
-            JOIN Equipo e_visit   ON e_visit.id_equipo  = pe_visit.id_equipo
+            LEFT JOIN Equipo e_visit   ON e_visit.id_equipo  = pe_visit.id_equipo
+            LEFT JOIN Resultado r_local  ON r_local.id_partido_equipo = pe_local.id_partido_equipo
+            LEFT JOIN Resultado r_visit  ON r_visit.id_partido_equipo = pe_visit.id_partido_equipo
             WHERE p.id_torneo = %s
-            ORDER BY p.fecha, p.hora
+            ORDER BY p.id_partido
         """
         conn = obtener_conexion()
         try:
@@ -141,5 +149,142 @@ class PartidoRepository:
         except Exception as exc:
             logger.error("PartidoRepository.actualizar_estado -> %s", exc)
             raise RepositorioError("Error al actualizar estado del partido.") from exc
+        finally:
+            conn.close()
+
+    def contar_por_torneo(self, id_torneo: int) -> int:
+        """Cuenta los partidos existentes en un torneo."""
+        sql = "SELECT COUNT(*) AS total FROM Partido WHERE id_torneo = %s"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo,))
+                    row = cur.fetchone()
+                    return int(row['total']) if row else 0
+        except Exception as exc:
+            logger.error("PartidoRepository.contar_por_torneo -> %s", exc)
+            raise RepositorioError("Error al contar partidos del torneo.") from exc
+        finally:
+            conn.close()
+
+    def existe_partido_finalizado(self, id_torneo: int) -> bool:
+        """Verifica si el torneo tiene al menos un partido ya finalizado."""
+        sql = "SELECT id_partido FROM Partido WHERE id_torneo = %s AND estado = 'Finalizado' LIMIT 1"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo,))
+                    return cur.fetchone() is not None
+        except Exception as exc:
+            logger.error("PartidoRepository.existe_partido_finalizado -> %s", exc)
+            raise RepositorioError("Error al verificar partidos finalizados.") from exc
+        finally:
+            conn.close()
+
+    def eliminar_por_torneo(self, id_torneo: int) -> None:
+        """
+        Elimina en cascada todos los Resultado, Partido_Equipo y Partido
+        asociados a un torneo. Se usa solo para regenerar un fixture sin
+        resultados registrados todavía.
+        """
+        sql = """
+            DELETE FROM Resultado
+            WHERE id_partido_equipo IN (
+                SELECT pe.id_partido_equipo
+                FROM Partido_Equipo pe
+                JOIN Partido p ON p.id_partido = pe.id_partido
+                WHERE p.id_torneo = %s
+            );
+
+            DELETE FROM Partido_Equipo
+            WHERE id_partido IN (
+                SELECT id_partido FROM Partido WHERE id_torneo = %s
+            );
+
+            DELETE FROM Partido WHERE id_torneo = %s;
+        """
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo, id_torneo, id_torneo))
+        except Exception as exc:
+            logger.error("PartidoRepository.eliminar_por_torneo -> %s", exc)
+            raise RepositorioError("Error al eliminar el fixture anterior del torneo.") from exc
+        finally:
+            conn.close()
+
+    def obtener_ultima_fase(self, id_torneo: int) -> Optional[str]:
+        """Retorna el nombre de la fase más reciente jugada en el torneo (o None si no hay partidos)."""
+        sql = """
+            SELECT fase FROM Partido
+            WHERE id_torneo = %s AND fase IS NOT NULL
+            ORDER BY id_partido DESC
+            LIMIT 1
+        """
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo,))
+                    row = cur.fetchone()
+                    return row['fase'] if row else None
+        except Exception as exc:
+            logger.error("PartidoRepository.obtener_ultima_fase -> %s", exc)
+            raise RepositorioError("Error al consultar la fase actual del torneo.") from exc
+        finally:
+            conn.close()
+
+    def listar_partidos_de_fase(self, id_torneo: int, fase: str) -> list:
+        """
+        Retorna los partidos de una fase específica del torneo, con los
+        equipos, puntajes y penales de cada lado (si ya se jugaron).
+        """
+        sql = """
+            SELECT
+                p.id_partido,
+                p.estado,
+                pe.id_condicion,
+                c.nombre_condicion,
+                pe.id_equipo,
+                e.nombre_equipo,
+                r.puntaje,
+                r.penales_local,
+                r.penales_visita
+            FROM Partido p
+            JOIN Partido_Equipo pe ON pe.id_partido = p.id_partido
+            JOIN Equipo e ON e.id_equipo = pe.id_equipo
+            JOIN Condicion c ON c.id_condicion = pe.id_condicion
+            LEFT JOIN Resultado r ON r.id_partido_equipo = pe.id_partido_equipo
+            WHERE p.id_torneo = %s AND p.fase = %s
+            ORDER BY p.id_partido, pe.id_condicion
+        """
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo, fase))
+                    return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            logger.error("PartidoRepository.listar_partidos_de_fase -> %s", exc)
+            raise RepositorioError("Error al consultar los partidos de la fase.") from exc
+        finally:
+            conn.close()
+
+    def contar_fases_distintas(self, id_torneo: int) -> int:
+        """Cuenta cuántas fases distintas (rondas) ya se jugaron en el torneo."""
+        sql = "SELECT COUNT(DISTINCT fase) AS total FROM Partido WHERE id_torneo = %s AND fase IS NOT NULL"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo,))
+                    row = cur.fetchone()
+                    return int(row['total']) if row else 0
+        except Exception as exc:
+            logger.error("PartidoRepository.contar_fases_distintas -> %s", exc)
+            raise RepositorioError("Error al contar las fases del torneo.") from exc
         finally:
             conn.close()

@@ -4,9 +4,11 @@ Servicio de lógica de negocio para la inscripción de equipos.
 import html
 import re
 
-from app.exceptions import EquipoDuplicadoError
+from app.exceptions import EquipoDuplicadoError, JugadorDuplicadoError, EquipoConJugadoresError
 from app.models.equipo import Equipo
+from app.models.jugador import Jugador
 from app.repositories.equipo_repo import EquipoRepository
+from app.repositories.jugador_repo import JugadorRepository
 from app.repositories.torneo_repo import TorneoRepository
 
 
@@ -17,9 +19,11 @@ class InscripcionService:
         self,
         equipo_repo: EquipoRepository,
         torneo_repo: TorneoRepository,
+        jugador_repo: JugadorRepository = None,
     ) -> None:
         self._equipo_repo = equipo_repo
         self._torneo_repo = torneo_repo
+        self._jugador_repo = jugador_repo or JugadorRepository()
 
     @staticmethod
     def _sanitizar(valor: str, max_len: int = 100) -> str:
@@ -90,3 +94,131 @@ class InscripcionService:
     def listar_equipos(self, id_torneo: int) -> list:
         """Retorna todos los equipos de un torneo."""
         return self._equipo_repo.listar_por_torneo(id_torneo)
+
+    def inscribir_jugador(
+        self,
+        nombre_jugador: str,
+        apellido_paterno: str,
+        apellido_materno: str,
+        dni: str,
+        id_equipo: int,
+    ) -> dict:
+        """
+        Valida y registra un jugador en el equipo indicado.
+
+        Args:
+            nombre_jugador:   Nombre del jugador.
+            apellido_paterno: Apellido paterno.
+            apellido_materno: Apellido materno.
+            dni:              Documento de identidad (único en todo el sistema).
+            id_equipo:        ID del equipo al que pertenece.
+
+        Returns:
+            dict con los datos del jugador creado.
+
+        Raises:
+            ValueError:            Si los datos de entrada son inválidos.
+            JugadorDuplicadoError: Si el DNI ya está registrado.
+            RepositorioError:      Si ocurre un error de base de datos.
+        """
+        nombre_jugador = self._sanitizar(nombre_jugador, max_len=50)
+        apellido_paterno = self._sanitizar(apellido_paterno, max_len=50)
+        apellido_materno = self._sanitizar(apellido_materno, max_len=50)
+        dni = self._sanitizar(dni, max_len=15)
+
+        if self._jugador_repo.existe_dni(dni):
+            raise JugadorDuplicadoError(
+                f"Ya existe un jugador registrado con el DNI '{dni}'."
+            )
+
+        jugador = Jugador(
+            nombre_jugador=nombre_jugador,
+            apellido_paterno=apellido_paterno,
+            apellido_materno=apellido_materno,
+            DNI=dni,
+            id_equipo=id_equipo,
+        )
+        return self._jugador_repo.guardar(jugador)
+
+    def listar_jugadores(self, id_equipo: int) -> list:
+        """Retorna todos los jugadores de un equipo."""
+        return self._jugador_repo.listar_por_equipo(id_equipo)
+
+    def actualizar_equipo(self, id_equipo: int, nombre_equipo: str, id_torneo: int) -> dict:
+        """
+        Renombra un equipo, validando que el nuevo nombre no choque con otro
+        equipo ya existente en el mismo torneo.
+        """
+        nombre_equipo = self._sanitizar(nombre_equipo)
+
+        equipo_actual = self._equipo_repo.obtener_por_id(id_equipo)
+        if not equipo_actual:
+            raise ValueError(f"No existe el equipo con ID: {id_equipo}")
+
+        if self._equipo_repo.existe_en_torneo(nombre_equipo, id_torneo) and \
+           nombre_equipo.lower() != equipo_actual['nombre_equipo'].lower():
+            raise EquipoDuplicadoError(
+                f"El equipo '{nombre_equipo}' ya está inscrito en este torneo."
+            )
+
+        return self._equipo_repo.actualizar_nombre(id_equipo, nombre_equipo)
+
+    def eliminar_equipo(self, id_equipo: int) -> None:
+        """
+        Elimina un equipo, siempre que no tenga jugadores inscritos.
+        """
+        equipo = self._equipo_repo.obtener_por_id(id_equipo)
+        if not equipo:
+            raise ValueError(f"No existe el equipo con ID: {id_equipo}")
+
+        total_jugadores = self._jugador_repo.contar_por_equipo(id_equipo)
+        if total_jugadores > 0:
+            raise EquipoConJugadoresError(
+                f"No se puede eliminar el equipo '{equipo['nombre_equipo']}' "
+                f"porque tiene {total_jugadores} jugador(es) inscrito(s). "
+                "Elimina primero a los jugadores."
+            )
+
+        self._equipo_repo.eliminar(id_equipo)
+
+    def actualizar_jugador(
+        self,
+        id_jugador: int,
+        nombre_jugador: str,
+        apellido_paterno: str,
+        apellido_materno: str,
+        dni: str,
+    ) -> dict:
+        """
+        Actualiza los datos de un jugador, validando el DNI si cambió.
+        """
+        nombre_jugador = self._sanitizar(nombre_jugador, max_len=50)
+        apellido_paterno = self._sanitizar(apellido_paterno, max_len=50)
+        apellido_materno = self._sanitizar(apellido_materno, max_len=50)
+        dni = self._sanitizar(dni, max_len=15)
+
+        jugador_actual = self._jugador_repo.obtener_por_id(id_jugador)
+        if not jugador_actual:
+            raise ValueError(f"No existe el jugador con ID: {id_jugador}")
+
+        if dni != jugador_actual['dni'] and self._jugador_repo.existe_dni(dni):
+            raise JugadorDuplicadoError(
+                f"Ya existe un jugador registrado con el DNI '{dni}'."
+            )
+
+        return self._jugador_repo.actualizar(
+            id_jugador=id_jugador,
+            nombre_jugador=nombre_jugador,
+            apellido_paterno=apellido_paterno,
+            apellido_materno=apellido_materno,
+            dni=dni,
+        )
+
+    def eliminar_jugador(self, id_jugador: int) -> None:
+        """Elimina un jugador por su ID."""
+        jugador = self._jugador_repo.obtener_por_id(id_jugador)
+        if not jugador:
+            raise ValueError(f"No existe el jugador con ID: {id_jugador}")
+        self._jugador_repo.eliminar(id_jugador)
+
+    

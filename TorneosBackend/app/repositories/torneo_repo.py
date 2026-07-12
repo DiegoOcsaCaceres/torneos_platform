@@ -17,8 +17,8 @@ class TorneoRepository:
     def guardar(self, torneo: Torneo) -> dict:
         """Inserta un nuevo torneo y retorna el registro creado."""
         sql = """
-            INSERT INTO Torneo (nombre_torneo, fecha_inicio, numero_equipos, id_deporte)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO Torneo (nombre_torneo, fecha_inicio, numero_equipos, id_deporte, formato)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING *
         """
         conn = obtener_conexion()
@@ -30,6 +30,7 @@ class TorneoRepository:
                         torneo.fecha_inicio,
                         torneo.numero_equipos,
                         torneo.id_deporte,
+                        torneo.formato,
                     ))
                     return dict(cur.fetchone())
         except Exception as exc:
@@ -91,5 +92,19 @@ class TorneoRepository:
         except Exception as exc:
             logger.error("TorneoRepository.listar_deportes -> %s", exc)
             raise RepositorioError("Error al listar deportes.") from exc
+        finally:
+            conn.close()
+
+    def eliminar(self, id_torneo: int) -> None:
+        """Elimina un torneo por su ID."""
+        sql = "DELETE FROM Torneo WHERE id_torneo = %s"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_torneo,))
+        except Exception as exc:
+            logger.error("TorneoRepository.eliminar -> %s", exc)
+            raise RepositorioError("Error al eliminar el torneo.") from exc
         finally:
             conn.close()

@@ -25,6 +25,7 @@ class Torneo(ABC):
     numero_equipos: int
     id_deporte: int
     id_torneo: Optional[int] = field(default=None)
+    formato: str = 'liga'
 
     @property
     @abstractmethod

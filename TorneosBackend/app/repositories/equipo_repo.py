@@ -2,6 +2,7 @@
 Repositorio de acceso a datos para la tabla 'Equipo' — Neon.tech (psycopg2).
 """
 import logging
+from typing import Optional
 
 from app.exceptions import RepositorioError
 from app.models.equipo import Equipo
@@ -85,3 +86,54 @@ class EquipoRepository:
             raise RepositorioError("Error al contar equipos del torneo.") from exc
         finally:
             conn.close()
+
+    def obtener_por_id(self, id_equipo: int) -> Optional[dict]:
+        """Busca un equipo por su ID. Retorna None si no existe."""
+        sql = "SELECT * FROM Equipo WHERE id_equipo = %s"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_equipo,))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        except Exception as exc:
+            logger.error("EquipoRepository.obtener_por_id -> %s", exc)
+            raise RepositorioError("Error al consultar el equipo.") from exc
+        finally:
+            conn.close()
+
+    def actualizar_nombre(self, id_equipo: int, nombre_equipo: str) -> dict:
+        """Actualiza el nombre de un equipo."""
+        sql = """
+            UPDATE Equipo SET nombre_equipo = %s
+            WHERE id_equipo = %s
+            RETURNING *
+        """
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (nombre_equipo, id_equipo))
+                    row = cur.fetchone()
+                    return dict(row) if row else None
+        except Exception as exc:
+            logger.error("EquipoRepository.actualizar_nombre -> %s", exc)
+            raise RepositorioError("Error al actualizar el equipo.") from exc
+        finally:
+            conn.close()
+
+    def eliminar(self, id_equipo: int) -> None:
+        """Elimina un equipo por su ID."""
+        sql = "DELETE FROM Equipo WHERE id_equipo = %s"
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (id_equipo,))
+        except Exception as exc:
+            logger.error("EquipoRepository.eliminar -> %s", exc)
+            raise RepositorioError("Error al eliminar el equipo.") from exc
+        finally:
+            conn.close()
+

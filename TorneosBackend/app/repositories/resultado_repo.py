@@ -13,18 +13,40 @@ logger = logging.getLogger(__name__)
 class ResultadoRepository:
     """CRUD sobre la tabla 'Resultado' usando psycopg2."""
 
-    def guardar(self, puntaje: int, id_partido_equipo: int) -> dict:
-        """Persiste el puntaje de un equipo en un partido."""
-        sql = """
-            INSERT INTO Resultado (puntaje, id_partido_equipo)
-            VALUES (%s, %s)
+    def guardar(
+        self,
+        puntaje: int,
+        id_partido_equipo: int,
+        penales: Optional[int] = None,
+        es_local: bool = True,
+    ) -> dict:
+        """
+        Persiste el puntaje de un equipo en un partido.
+
+        El parámetro `penales` solo se usa en Torneo Relámpago, cuando el
+        partido se definió por tanda de penales. En Liga siempre queda None.
+        `es_local` indica en cuál de las dos columnas (penales_local o
+        penales_visita) debe guardarse ese valor — cada fila de Resultado
+        corresponde a un solo equipo, nunca a los dos a la vez.
+        """
+        penales_local = penales if es_local else None
+        penales_visita = penales if not es_local else None
+
+        sql_borrar = "DELETE FROM Resultado WHERE id_partido_equipo = %s"
+        sql_insertar = """
+            INSERT INTO Resultado (puntaje, id_partido_equipo, penales_local, penales_visita)
+            VALUES (%s, %s, %s, %s)
             RETURNING *
         """
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (puntaje, id_partido_equipo))
+                    # Si ya existía un resultado para este equipo en este partido
+                    # (por ejemplo, al corregir un marcador), se reemplaza en vez
+                    # de acumular filas duplicadas.
+                    cur.execute(sql_borrar, (id_partido_equipo,))
+                    cur.execute(sql_insertar, (puntaje, id_partido_equipo, penales_local, penales_visita))
                     return dict(cur.fetchone())
         except Exception as exc:
             logger.error("ResultadoRepository.guardar -> %s", exc)
@@ -57,6 +79,8 @@ class ResultadoRepository:
             SELECT
                 r.id_resultado,
                 r.puntaje,
+                r.penales_local,
+                r.penales_visita,
                 e.nombre_equipo,
                 c.nombre_condicion,
                 pe.id_partido_equipo

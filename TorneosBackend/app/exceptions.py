@@ -21,3 +21,20 @@ class FixtureError(Exception):
 
 class ResultadoInvalidoError(Exception):
     """El marcador proporcionado viola las reglas del deporte."""
+
+class UsuarioDuplicadoError(Exception):
+    """Ya existe un usuario registrado con ese correo electrónico."""
+
+
+class CredencialesInvalidasError(Exception):
+    """El correo o la contraseña no son correctos."""
+
+
+class JugadorDuplicadoError(Exception):
+    """Ya existe un jugador registrado con ese DNI."""
+
+class EquipoConJugadoresError(Exception):
+    """No se puede eliminar el equipo porque tiene jugadores inscritos."""
+
+class TorneoConEquiposError(Exception):
+    """No se puede eliminar el torneo porque tiene equipos inscritos."""

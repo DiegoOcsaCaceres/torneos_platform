@@ -17,6 +17,7 @@ CREATE TABLE Torneo (
     fecha_inicio DATE,
     numero_equipos INT,
     id_deporte INT,
+    formato VARCHAR(20) DEFAULT 'liga',
     FOREIGN KEY (id_deporte) REFERENCES Deporte(id_deporte)
 );
 
@@ -56,6 +57,7 @@ CREATE TABLE Partido (
     estado VARCHAR(20),
     id_cancha INT,
     id_torneo INT,
+    fase VARCHAR(30),
     FOREIGN KEY (id_cancha) REFERENCES Cancha(id_cancha),
     FOREIGN KEY (id_torneo) REFERENCES Torneo(id_torneo)
 );
@@ -74,6 +76,8 @@ CREATE TABLE Resultado (
     id_resultado SERIAL PRIMARY KEY,
     puntaje INT,
     id_partido_equipo INT,
+    penales_local INT,
+    penales_visita INT,
     FOREIGN KEY (id_partido_equipo) REFERENCES Partido_Equipo(id_partido_equipo)
 );
 
@@ -127,3 +131,19 @@ INSERT INTO Partido_Equipo (id_partido, id_equipo, id_condicion) VALUES
 INSERT INTO Resultado (puntaje, id_partido_equipo) VALUES 
 (3, 1),
 (1, 2);
+
+-- ============================================================
+-- MÓDULO DE AUTENTICACIÓN
+-- ============================================================
+
+CREATE TABLE Usuario (
+    id_usuario SERIAL PRIMARY KEY,
+    nombres VARCHAR(50) NOT NULL,
+    apellido_paterno VARCHAR(50) NOT NULL,
+    apellido_materno VARCHAR(50) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    rol VARCHAR(20) NOT NULL DEFAULT 'ORGANIZADOR',
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_registro TIMESTAMP NOT NULL DEFAULT NOW()
+);
