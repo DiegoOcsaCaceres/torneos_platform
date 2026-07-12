@@ -32,7 +32,8 @@ class ResultadoRepository:
         penales_local = penales if es_local else None
         penales_visita = penales if not es_local else None
 
-        sql = """
+        sql_borrar = "DELETE FROM Resultado WHERE id_partido_equipo = %s"
+        sql_insertar = """
             INSERT INTO Resultado (puntaje, id_partido_equipo, penales_local, penales_visita)
             VALUES (%s, %s, %s, %s)
             RETURNING *
@@ -41,7 +42,11 @@ class ResultadoRepository:
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (puntaje, id_partido_equipo, penales_local, penales_visita))
+                    # Si ya existía un resultado para este equipo en este partido
+                    # (por ejemplo, al corregir un marcador), se reemplaza en vez
+                    # de acumular filas duplicadas.
+                    cur.execute(sql_borrar, (id_partido_equipo,))
+                    cur.execute(sql_insertar, (puntaje, id_partido_equipo, penales_local, penales_visita))
                     return dict(cur.fetchone())
         except Exception as exc:
             logger.error("ResultadoRepository.guardar -> %s", exc)
