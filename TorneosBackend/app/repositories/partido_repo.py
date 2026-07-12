@@ -73,6 +73,7 @@ class PartidoRepository:
                 p.estado,
                 p.id_cancha,
                 p.id_torneo,
+                p.fase,
                 e_local.nombre_equipo  AS equipo_local,
                 e_visit.nombre_equipo  AS equipo_visitante,
                 pe_local.id_partido_equipo  AS id_pe_local,
@@ -82,14 +83,14 @@ class PartidoRepository:
             FROM Partido p
             JOIN Partido_Equipo pe_local  ON pe_local.id_partido  = p.id_partido
                                          AND pe_local.id_condicion = 1
-            JOIN Partido_Equipo pe_visit  ON pe_visit.id_partido  = p.id_partido
-                                         AND pe_visit.id_condicion = 2
+            LEFT JOIN Partido_Equipo pe_visit  ON pe_visit.id_partido  = p.id_partido
+                                              AND pe_visit.id_condicion = 2
             JOIN Equipo e_local   ON e_local.id_equipo  = pe_local.id_equipo
-            JOIN Equipo e_visit   ON e_visit.id_equipo  = pe_visit.id_equipo
+            LEFT JOIN Equipo e_visit   ON e_visit.id_equipo  = pe_visit.id_equipo
             LEFT JOIN Resultado r_local  ON r_local.id_partido_equipo = pe_local.id_partido_equipo
             LEFT JOIN Resultado r_visit  ON r_visit.id_partido_equipo = pe_visit.id_partido_equipo
             WHERE p.id_torneo = %s
-            ORDER BY p.fecha, p.hora
+            ORDER BY p.id_partido
         """
         conn = obtener_conexion()
         try:
