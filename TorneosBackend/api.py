@@ -51,10 +51,13 @@ from app.services.resultado_service import ResultadoService
 
 app = FastAPI(title="Canchalibre API", version="1.0.0")
 
-# ── CORS: permite que el frontend (Vite, puerto 5173) le hable a esta API ──
+# ── CORS: permite que el frontend le hable a esta API ──
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "https://frontend-canchalibre.onrender.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
