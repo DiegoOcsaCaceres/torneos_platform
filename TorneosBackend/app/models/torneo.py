@@ -19,6 +19,7 @@ class Torneo(ABC):
         numero_equipos: Límite de equipos participantes.
         id_deporte:     FK al deporte asociado.
         id_torneo:      ID serial asignado tras la persistencia.
+        jugadores_por_equipo: Cantidad de jugadores requerida por equipo.
     """
     nombre_torneo: str
     fecha_inicio: date
@@ -26,6 +27,7 @@ class Torneo(ABC):
     id_deporte: int
     id_torneo: Optional[int] = field(default=None)
     formato: str = 'liga'
+    jugadores_por_equipo: int = 5
 
     @property
     @abstractmethod

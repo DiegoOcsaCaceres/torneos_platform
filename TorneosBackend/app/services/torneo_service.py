@@ -31,6 +31,7 @@ class TorneoService:
         fecha_inicio: date,
         id_deporte: int,
         formato: str = 'liga',
+        jugadores_por_equipo: int = 5,
     ) -> dict:
         """
         Valida parámetros, crea el objeto Torneo con Factory y lo persiste.
@@ -49,6 +50,7 @@ class TorneoService:
             fecha_inicio=fecha_inicio,
             id_deporte=id_deporte,
             formato=formato,
+            jugadores_por_equipo=jugadores_por_equipo,
         )
         return self._torneo_repo.guardar(torneo)
 

@@ -6,7 +6,15 @@ from datetime import date
 
 from app.models.torneo_futbol import TorneoFutbol
 from app.models.torneo_voley import TorneoVoley
-from config.settings import DEPORTES_VALIDOS, MIN_EQUIPOS, MAX_EQUIPOS_FUTBOL, MAX_EQUIPOS_VOLEY
+from config.settings import (
+    DEPORTES_VALIDOS,
+    MIN_EQUIPOS,
+    MAX_EQUIPOS_FUTBOL,
+    MAX_EQUIPOS_VOLEY,
+    MIN_JUGADORES_POR_EQUIPO_FUTBOL,
+    MIN_JUGADORES_POR_EQUIPO_VOLEY,
+    MAX_JUGADORES_POR_EQUIPO,
+)
 
 
 class TorneoFactory:
@@ -20,6 +28,7 @@ class TorneoFactory:
         fecha_inicio: date,
         id_deporte: int,
         formato: str = 'liga',
+        jugadores_por_equipo: int = 5,
     ):
         """
         Valida los parámetros y retorna una instancia de TorneoFutbol o TorneoVoley.
@@ -30,6 +39,7 @@ class TorneoFactory:
             numero_equipos: Número máximo de equipos.
             fecha_inicio:   Fecha de inicio.
             id_deporte:     FK al deporte en la BD.
+            jugadores_por_equipo: Cantidad de jugadores requerida por equipo.
 
         Returns:
             TorneoFutbol | TorneoVoley
@@ -60,12 +70,23 @@ class TorneoFactory:
                 "Opciones: 'liga' o 'eliminacion_directa'."
             )
 
+        min_jugadores = (
+            MIN_JUGADORES_POR_EQUIPO_FUTBOL if tipo == 'futbol'
+            else MIN_JUGADORES_POR_EQUIPO_VOLEY
+        )
+        if not (min_jugadores <= jugadores_por_equipo <= MAX_JUGADORES_POR_EQUIPO):
+            raise ValueError(
+                f"Para {tipo}, el número de jugadores por equipo debe estar entre "
+                f"{min_jugadores} y {MAX_JUGADORES_POR_EQUIPO}."
+            )
+
         kwargs = dict(
             nombre_torneo=nombre_torneo,
             fecha_inicio=fecha_inicio,
             numero_equipos=numero_equipos,
             id_deporte=id_deporte,
             formato=formato,
+            jugadores_por_equipo=jugadores_por_equipo,
         )
 
         if tipo == 'futbol':
