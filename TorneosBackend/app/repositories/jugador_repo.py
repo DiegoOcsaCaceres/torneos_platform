@@ -17,8 +17,8 @@ class JugadorRepository:
     def guardar(self, jugador: Jugador) -> dict:
         """Inserta un nuevo jugador y retorna el registro creado."""
         sql = """
-            INSERT INTO Jugador (nombre_jugador, apellido_paterno, apellido_materno, DNI, id_equipo)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO Jugador (nombre_jugador, apellido_paterno, apellido_materno, DNI, id_equipo, edad, foto)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING *
         """
         conn = obtener_conexion()
@@ -31,6 +31,8 @@ class JugadorRepository:
                         jugador.apellido_materno,
                         jugador.DNI,
                         jugador.id_equipo,
+                        jugador.edad,
+                        jugador.foto,
                     ))
                     return dict(cur.fetchone())
         except Exception as exc:
@@ -112,11 +114,14 @@ class JugadorRepository:
         apellido_paterno: str,
         apellido_materno: str,
         dni: str,
+        edad: Optional[int] = None,
+        foto: Optional[str] = None,
     ) -> dict:
         """Actualiza los datos de un jugador."""
         sql = """
             UPDATE Jugador
-            SET nombre_jugador = %s, apellido_paterno = %s, apellido_materno = %s, DNI = %s
+            SET nombre_jugador = %s, apellido_paterno = %s, apellido_materno = %s, DNI = %s,
+                edad = %s, foto = %s
             WHERE id_jugador = %s
             RETURNING *
         """
@@ -124,7 +129,10 @@ class JugadorRepository:
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (nombre_jugador, apellido_paterno, apellido_materno, dni, id_jugador))
+                    cur.execute(sql, (
+                        nombre_jugador, apellido_paterno, apellido_materno, dni,
+                        edad, foto, id_jugador,
+                    ))
                     row = cur.fetchone()
                     return dict(row) if row else None
         except Exception as exc:

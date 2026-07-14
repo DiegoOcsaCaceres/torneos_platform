@@ -3,6 +3,7 @@ Servicio de lógica de negocio para la inscripción de equipos.
 """
 import html
 import re
+from typing import Optional
 
 from app.exceptions import EquipoDuplicadoError, JugadorDuplicadoError, EquipoConJugadoresError
 from app.models.equipo import Equipo
@@ -95,6 +96,25 @@ class InscripcionService:
         """Retorna todos los equipos de un torneo."""
         return self._equipo_repo.listar_por_torneo(id_torneo)
 
+    @staticmethod
+    def _validar_edad(edad: Optional[int]) -> Optional[int]:
+        if edad is None:
+            return None
+        if not isinstance(edad, int) or edad < 5 or edad > 99:
+            raise ValueError("La edad debe ser un entero entre 5 y 99 años.")
+        return edad
+
+    @staticmethod
+    def _validar_foto(foto: Optional[str]) -> Optional[str]:
+        if not foto:
+            return None
+        if not isinstance(foto, str):
+            raise TypeError("La foto debe ser una cadena en formato Base64.")
+        # ~1.5MB en Base64 (equivalente al límite validado en el frontend)
+        if len(foto) > 2_100_000:
+            raise ValueError("La imagen es muy grande. El límite es de 1.5MB.")
+        return foto
+
     def inscribir_jugador(
         self,
         nombre_jugador: str,
@@ -102,6 +122,8 @@ class InscripcionService:
         apellido_materno: str,
         dni: str,
         id_equipo: int,
+        edad: Optional[int] = None,
+        foto: Optional[str] = None,
     ) -> dict:
         """
         Valida y registra un jugador en el equipo indicado.
@@ -112,6 +134,8 @@ class InscripcionService:
             apellido_materno: Apellido materno.
             dni:              Documento de identidad (único en todo el sistema).
             id_equipo:        ID del equipo al que pertenece.
+            edad:             Edad del jugador (opcional).
+            foto:             Foto del jugador en Base64 (opcional).
 
         Returns:
             dict con los datos del jugador creado.
@@ -125,6 +149,8 @@ class InscripcionService:
         apellido_paterno = self._sanitizar(apellido_paterno, max_len=50)
         apellido_materno = self._sanitizar(apellido_materno, max_len=50)
         dni = self._sanitizar(dni, max_len=15)
+        edad = self._validar_edad(edad)
+        foto = self._validar_foto(foto)
 
         if self._jugador_repo.existe_dni(dni):
             raise JugadorDuplicadoError(
@@ -137,6 +163,8 @@ class InscripcionService:
             apellido_materno=apellido_materno,
             DNI=dni,
             id_equipo=id_equipo,
+            edad=edad,
+            foto=foto,
         )
         return self._jugador_repo.guardar(jugador)
 
@@ -188,14 +216,20 @@ class InscripcionService:
         apellido_paterno: str,
         apellido_materno: str,
         dni: str,
+        edad: Optional[int] = None,
+        foto: Optional[str] = None,
     ) -> dict:
         """
         Actualiza los datos de un jugador, validando el DNI si cambió.
+        Si 'edad' o 'foto' no se envían, se conserva el valor que ya
+        tenía el jugador en la base de datos (no se pisan con NULL).
         """
         nombre_jugador = self._sanitizar(nombre_jugador, max_len=50)
         apellido_paterno = self._sanitizar(apellido_paterno, max_len=50)
         apellido_materno = self._sanitizar(apellido_materno, max_len=50)
         dni = self._sanitizar(dni, max_len=15)
+        edad = self._validar_edad(edad)
+        foto = self._validar_foto(foto)
 
         jugador_actual = self._jugador_repo.obtener_por_id(id_jugador)
         if not jugador_actual:
@@ -206,12 +240,17 @@ class InscripcionService:
                 f"Ya existe un jugador registrado con el DNI '{dni}'."
             )
 
+        edad_final = edad if edad is not None else jugador_actual.get('edad')
+        foto_final = foto if foto is not None else jugador_actual.get('foto')
+
         return self._jugador_repo.actualizar(
             id_jugador=id_jugador,
             nombre_jugador=nombre_jugador,
             apellido_paterno=apellido_paterno,
             apellido_materno=apellido_materno,
             dni=dni,
+            edad=edad_final,
+            foto=foto_final,
         )
 
     def eliminar_jugador(self, id_jugador: int) -> None:

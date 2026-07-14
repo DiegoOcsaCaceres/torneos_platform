@@ -17,6 +17,8 @@ class Jugador:
         apellido_materno: Apellido materno.
         DNI:              Documento de identidad (único).
         id_equipo:        FK al equipo al que pertenece.
+        edad:             Edad del jugador (opcional).
+        foto:             Foto del jugador en Base64 (data URL, opcional).
         id_jugador:       ID serial asignado tras la persistencia.
     """
     nombre_jugador: str
@@ -24,6 +26,8 @@ class Jugador:
     apellido_materno: str
     DNI: str
     id_equipo: int
+    edad: Optional[int] = None
+    foto: Optional[str] = None
     id_jugador: Optional[int] = None
 
     def nombre_completo(self) -> str:

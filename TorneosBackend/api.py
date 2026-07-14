@@ -115,6 +115,8 @@ class JugadorCreateRequest(BaseModel):
     apellido_paterno: str
     apellido_materno: str
     dni: str
+    edad: Optional[int] = None
+    foto: Optional[str] = None
 
 
 class EquipoUpdateRequest(BaseModel):
@@ -127,6 +129,8 @@ class JugadorUpdateRequest(BaseModel):
     apellido_paterno: str
     apellido_materno: str
     dni: str
+    edad: Optional[int] = None
+    foto: Optional[str] = None
 
 
 class FixtureCreateRequest(BaseModel):
@@ -343,6 +347,8 @@ def inscribir_jugador_endpoint(
             apellido_materno=payload.apellido_materno,
             dni=payload.dni,
             id_equipo=id_equipo,
+            edad=payload.edad,
+            foto=payload.foto,
         )
         return {"mensaje": f"Jugador '{jugador['nombre_jugador']}' inscrito exitosamente.", "jugador": jugador}
     except JugadorDuplicadoError as exc:
@@ -409,6 +415,8 @@ def actualizar_jugador_endpoint(
             apellido_paterno=payload.apellido_paterno,
             apellido_materno=payload.apellido_materno,
             dni=payload.dni,
+            edad=payload.edad,
+            foto=payload.foto,
         )
         return {"mensaje": "Jugador actualizado exitosamente.", "jugador": jugador}
     except JugadorDuplicadoError as exc:
