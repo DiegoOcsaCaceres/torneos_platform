@@ -37,6 +37,8 @@ CREATE TABLE Jugador (
     apellido_materno VARCHAR(50) NOT NULL,
     DNI VARCHAR(15) UNIQUE NOT NULL,
     id_equipo INT,
+    edad INT,
+    foto TEXT,
     FOREIGN KEY (id_equipo) REFERENCES Equipo(id_equipo)
 );
 
