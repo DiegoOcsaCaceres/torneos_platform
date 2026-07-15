@@ -266,6 +266,7 @@ def crear_torneo_endpoint(
             id_deporte=id_deporte,
             formato=payload.formato,
             jugadores_por_equipo=payload.jugadores_por_equipo,
+            id_usuario=int(usuario_actual["sub"]),
         )
         return {"mensaje": "Torneo creado exitosamente.", "torneo": torneo}
     except ValueError as exc:
@@ -275,17 +276,20 @@ def crear_torneo_endpoint(
 
 
 @app.get("/torneos")
-def listar_torneos_endpoint():
+def listar_torneos_endpoint(usuario_actual: dict = Depends(obtener_usuario_actual)):
     try:
-        return torneo_service.listar_torneos()
+        return torneo_service.listar_torneos(id_usuario=int(usuario_actual["sub"]))
     except RepositorioError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.get("/torneos/{id_torneo}")
-def obtener_torneo_endpoint(id_torneo: int):
+def obtener_torneo_endpoint(
+    id_torneo: int,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
     try:
-        return torneo_service.obtener_torneo(id_torneo)
+        return torneo_service.obtener_torneo(id_torneo, id_usuario=int(usuario_actual["sub"]))
     except TorneoNoEncontradoError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except RepositorioError as exc:
@@ -297,7 +301,7 @@ def eliminar_torneo_endpoint(
     usuario_actual: dict = Depends(obtener_usuario_actual),
 ):
     try:
-        torneo_service.eliminar_torneo(id_torneo)
+        torneo_service.eliminar_torneo(id_torneo, id_usuario=int(usuario_actual["sub"]))
         return {"mensaje": "Torneo eliminado exitosamente."}
     except TorneoNoEncontradoError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

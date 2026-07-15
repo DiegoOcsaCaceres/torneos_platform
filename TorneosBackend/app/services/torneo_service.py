@@ -32,9 +32,11 @@ class TorneoService:
         id_deporte: int,
         formato: str = 'liga',
         jugadores_por_equipo: int = 5,
+        id_usuario: int = None,
     ) -> dict:
         """
-        Valida parámetros, crea el objeto Torneo con Factory y lo persiste.
+        Valida parámetros, crea el objeto Torneo con Factory y lo persiste
+        asociado a la cuenta (id_usuario) que lo está creando.
 
         Returns:
             dict con los datos del torneo creado.
@@ -51,38 +53,46 @@ class TorneoService:
             id_deporte=id_deporte,
             formato=formato,
             jugadores_por_equipo=jugadores_por_equipo,
+            id_usuario=id_usuario,
         )
         return self._torneo_repo.guardar(torneo)
 
-    def listar_torneos(self) -> list:
-        """Retorna todos los torneos registrados."""
-        return self._torneo_repo.listar()
+    def listar_torneos(self, id_usuario: int = None) -> list:
+        """
+        Retorna los torneos de la cuenta indicada.
+
+        Si id_usuario es None, retorna todos los torneos (uso interno/admin);
+        los endpoints públicos siempre deben pasar el id_usuario de la sesión.
+        """
+        return self._torneo_repo.listar(id_usuario=id_usuario)
 
     def listar_deportes(self) -> list:
         """Retorna todos los deportes disponibles."""
         return self._torneo_repo.listar_deportes()
 
-    def obtener_torneo(self, id_torneo: int) -> dict:
+    def obtener_torneo(self, id_torneo: int, id_usuario: int = None) -> dict:
         """
-        Busca un torneo por su ID.
+        Busca un torneo por su ID, verificando que pertenezca a id_usuario
+        cuando se proporciona.
 
         Raises:
-            TorneoNoEncontradoError: Si no existe.
+            TorneoNoEncontradoError: Si no existe o no pertenece a la cuenta.
         """
-        torneo = self._torneo_repo.obtener_por_id(id_torneo)
+        torneo = self._torneo_repo.obtener_por_id(id_torneo, id_usuario=id_usuario)
         if not torneo:
             raise TorneoNoEncontradoError(f"No se encontró el torneo con ID: {id_torneo}")
         return torneo
 
-    def eliminar_torneo(self, id_torneo: int) -> None:
+    def eliminar_torneo(self, id_torneo: int, id_usuario: int = None) -> None:
         """
-        Elimina un torneo, siempre que no tenga equipos inscritos.
+        Elimina un torneo, siempre que pertenezca a id_usuario (si se indica)
+        y que no tenga equipos inscritos.
 
         Raises:
-            TorneoNoEncontradoError: Si el torneo no existe.
+            TorneoNoEncontradoError: Si el torneo no existe o no es de la cuenta.
             TorneoConEquiposError:   Si el torneo tiene equipos inscritos.
         """
-        torneo = self._torneo_repo.obtener_por_id(id_torneo)
+        torneo = self._torneo_repo.obtener_por_id(id_torneo, id_usuario=id_usuario)
         if not torneo:
             raise TorneoNoEncontradoError(f"No se encontró el torneo con ID: {id_torneo}")
 

@@ -17,8 +17,8 @@ class TorneoRepository:
     def guardar(self, torneo: Torneo) -> dict:
         """Inserta un nuevo torneo y retorna el registro creado."""
         sql = """
-            INSERT INTO Torneo (nombre_torneo, fecha_inicio, numero_equipos, id_deporte, formato, jugadores_por_equipo)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO Torneo (nombre_torneo, fecha_inicio, numero_equipos, id_deporte, formato, jugadores_por_equipo, id_usuario)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING *
         """
         conn = obtener_conexion()
@@ -32,6 +32,7 @@ class TorneoRepository:
                         torneo.id_deporte,
                         torneo.formato,
                         torneo.jugadores_por_equipo,
+                        torneo.id_usuario,
                     ))
                     return dict(cur.fetchone())
         except Exception as exc:
@@ -40,19 +41,29 @@ class TorneoRepository:
         finally:
             conn.close()
 
-    def obtener_por_id(self, id_torneo: int) -> Optional[dict]:
-        """Busca un torneo por su ID. Retorna None si no existe."""
+    def obtener_por_id(self, id_torneo: int, id_usuario: Optional[int] = None) -> Optional[dict]:
+        """
+        Busca un torneo por su ID. Retorna None si no existe.
+
+        Si se pasa id_usuario, solo retorna el torneo si pertenece a esa cuenta;
+        de lo contrario retorna None (evita filtrar torneos de otras cuentas).
+        """
         sql = """
             SELECT t.*, d.nombre_deporte, d.reglas
             FROM Torneo t
             JOIN Deporte d ON d.id_deporte = t.id_deporte
             WHERE t.id_torneo = %s
         """
+        parametros = [id_torneo]
+        if id_usuario is not None:
+            sql += " AND t.id_usuario = %s"
+            parametros.append(id_usuario)
+
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql, (id_torneo,))
+                    cur.execute(sql, tuple(parametros))
                     row = cur.fetchone()
                     return dict(row) if row else None
         except Exception as exc:
@@ -61,19 +72,29 @@ class TorneoRepository:
         finally:
             conn.close()
 
-    def listar(self) -> list:
-        """Retorna todos los torneos con el nombre de su deporte."""
+    def listar(self, id_usuario: Optional[int] = None) -> list:
+        """
+        Retorna los torneos con el nombre de su deporte.
+
+        Si se pasa id_usuario, solo retorna los torneos de esa cuenta, para que
+        cada cuenta vea únicamente los torneos que ella misma creó.
+        """
         sql = """
             SELECT t.*, d.nombre_deporte
             FROM Torneo t
             JOIN Deporte d ON d.id_deporte = t.id_deporte
-            ORDER BY t.id_torneo
         """
+        parametros = ()
+        if id_usuario is not None:
+            sql += " WHERE t.id_usuario = %s"
+            parametros = (id_usuario,)
+        sql += " ORDER BY t.id_torneo"
+
         conn = obtener_conexion()
         try:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql)
+                    cur.execute(sql, parametros)
                     return [dict(r) for r in cur.fetchall()]
         except Exception as exc:
             logger.error("TorneoRepository.listar -> %s", exc)

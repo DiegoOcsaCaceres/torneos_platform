@@ -29,6 +29,7 @@ class TorneoFactory:
         id_deporte: int,
         formato: str = 'liga',
         jugadores_por_equipo: int = 5,
+        id_usuario: int = None,
     ):
         """
         Valida los parámetros y retorna una instancia de TorneoFutbol o TorneoVoley.
@@ -40,6 +41,7 @@ class TorneoFactory:
             fecha_inicio:   Fecha de inicio.
             id_deporte:     FK al deporte en la BD.
             jugadores_por_equipo: Cantidad de jugadores requerida por equipo.
+            id_usuario:     FK a la cuenta dueña del torneo.
 
         Returns:
             TorneoFutbol | TorneoVoley
@@ -87,6 +89,7 @@ class TorneoFactory:
             id_deporte=id_deporte,
             formato=formato,
             jugadores_por_equipo=jugadores_por_equipo,
+            id_usuario=id_usuario,
         )
 
         if tipo == 'futbol':
