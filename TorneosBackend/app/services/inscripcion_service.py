@@ -152,9 +152,13 @@ class InscripcionService:
         edad = self._validar_edad(edad)
         foto = self._validar_foto(foto)
 
-        if self._jugador_repo.existe_dni(dni):
+        equipo = self._equipo_repo.obtener_por_id(id_equipo)
+        if not equipo:
+            raise ValueError(f"No existe el equipo con ID: {id_equipo}")
+
+        if self._jugador_repo.existe_dni_en_torneo(dni, equipo['id_torneo']):
             raise JugadorDuplicadoError(
-                f"Ya existe un jugador registrado con el DNI '{dni}'."
+                f"Ya existe un jugador registrado con el DNI '{dni}' en este torneo."
             )
 
         jugador = Jugador(
@@ -235,10 +239,14 @@ class InscripcionService:
         if not jugador_actual:
             raise ValueError(f"No existe el jugador con ID: {id_jugador}")
 
-        if dni != jugador_actual['dni'] and self._jugador_repo.existe_dni(dni):
-            raise JugadorDuplicadoError(
-                f"Ya existe un jugador registrado con el DNI '{dni}'."
-            )
+        if dni != jugador_actual['dni']:
+            equipo = self._equipo_repo.obtener_por_id(jugador_actual['id_equipo'])
+            if not equipo:
+                raise ValueError(f"No existe el equipo con ID: {jugador_actual['id_equipo']}")
+            if self._jugador_repo.existe_dni_en_torneo(dni, equipo['id_torneo'], excluir_id_jugador=id_jugador):
+                raise JugadorDuplicadoError(
+                    f"Ya existe un jugador registrado con el DNI '{dni}' en este torneo."
+                )
 
         edad_final = edad if edad is not None else jugador_actual.get('edad')
         foto_final = foto if foto is not None else jugador_actual.get('foto')
@@ -259,5 +267,3 @@ class InscripcionService:
         if not jugador:
             raise ValueError(f"No existe el jugador con ID: {id_jugador}")
         self._jugador_repo.eliminar(id_jugador)
-
-    

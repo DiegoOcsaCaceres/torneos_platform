@@ -56,6 +56,38 @@ class JugadorRepository:
         finally:
             conn.close()
 
+    def existe_dni_en_torneo(self, dni: str, id_torneo: int, excluir_id_jugador: Optional[int] = None) -> bool:
+        """
+        Verifica si ya existe un jugador con ese DNI en un equipo del mismo torneo.
+        Permite que un mismo DNI participe en torneos distintos, pero no en dos
+        equipos del mismo torneo a la vez.
+
+        'excluir_id_jugador' se usa al actualizar, para no comparar al jugador
+        contra sí mismo.
+        """
+        sql = """
+            SELECT j.id_jugador
+            FROM Jugador j
+            JOIN Equipo e ON e.id_equipo = j.id_equipo
+            WHERE j.DNI = %s AND e.id_torneo = %s
+        """
+        parametros = [dni, id_torneo]
+        if excluir_id_jugador is not None:
+            sql += " AND j.id_jugador != %s"
+            parametros.append(excluir_id_jugador)
+
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, tuple(parametros))
+                    return cur.fetchone() is not None
+        except Exception as exc:
+            logger.error("JugadorRepository.existe_dni_en_torneo -> %s", exc)
+            raise RepositorioError("Error al verificar duplicidad de DNI en el torneo.") from exc
+        finally:
+            conn.close()
+
     def listar_por_equipo(self, id_equipo: int) -> list:
         """Retorna todos los jugadores de un equipo."""
         sql = """
@@ -154,5 +186,3 @@ class JugadorRepository:
             raise RepositorioError("Error al eliminar el jugador.") from exc
         finally:
             conn.close()
-
-    

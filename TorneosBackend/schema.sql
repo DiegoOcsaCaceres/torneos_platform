@@ -1,8 +1,22 @@
+
 -- ============================================================
--- ESQUEMA ACTUALIZADO — torneos_deportivos_db
--- Nuevo diseño con tablas: Deporte, Torneo, Equipo, Jugador,
--- Cancha, Condicion, Partido, Partido_Equipo, Resultado
--- Ejecutar en el SQL Editor de Neon.tech
+-- MÓDULO DE AUTENTICACIÓN
+-- ============================================================
+
+CREATE TABLE Usuario (
+    id_usuario SERIAL PRIMARY KEY,
+    nombres VARCHAR(50) NOT NULL,
+    apellido_paterno VARCHAR(50) NOT NULL,
+    apellido_materno VARCHAR(50) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    rol VARCHAR(20) NOT NULL DEFAULT 'ORGANIZADOR',
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_registro TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================
+-- MÓDULO DE TORNEOS
 -- ============================================================
 
 CREATE TABLE Deporte (
@@ -19,7 +33,9 @@ CREATE TABLE Torneo (
     id_deporte INT,
     formato VARCHAR(20) DEFAULT 'liga',
     jugadores_por_equipo INT DEFAULT 5,
-    FOREIGN KEY (id_deporte) REFERENCES Deporte(id_deporte)
+    id_usuario INT,
+    FOREIGN KEY (id_deporte) REFERENCES Deporte(id_deporte),
+    FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario) ON DELETE SET NULL
 );
 
 CREATE TABLE Equipo (
@@ -35,12 +51,13 @@ CREATE TABLE Jugador (
     nombre_jugador VARCHAR(50) NOT NULL,
     apellido_paterno VARCHAR(50) NOT NULL,
     apellido_materno VARCHAR(50) NOT NULL,
-    DNI VARCHAR(15) UNIQUE NOT NULL,
+    DNI VARCHAR(15) NOT NULL,
     id_equipo INT,
     edad INT,
     foto TEXT,
     FOREIGN KEY (id_equipo) REFERENCES Equipo(id_equipo)
 );
+
 
 CREATE TABLE Cancha (
     id_cancha SERIAL PRIMARY KEY,
@@ -86,6 +103,9 @@ CREATE TABLE Resultado (
 
 -- ============================================================
 -- DATOS DE PRUEBA
+-- Nota: los torneos de ejemplo se insertan con id_usuario = NULL
+-- (la columna es nullable) para no depender de un Usuario concreto
+-- al reconstruir la BD desde cero.
 -- ============================================================
 
 INSERT INTO Deporte (nombre_deporte, reglas) VALUES 
@@ -134,19 +154,3 @@ INSERT INTO Partido_Equipo (id_partido, id_equipo, id_condicion) VALUES
 INSERT INTO Resultado (puntaje, id_partido_equipo) VALUES 
 (3, 1),
 (1, 2);
-
--- ============================================================
--- MÓDULO DE AUTENTICACIÓN
--- ============================================================
-
-CREATE TABLE Usuario (
-    id_usuario SERIAL PRIMARY KEY,
-    nombres VARCHAR(50) NOT NULL,
-    apellido_paterno VARCHAR(50) NOT NULL,
-    apellido_materno VARCHAR(50) NOT NULL,
-    email VARCHAR(150) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    rol VARCHAR(20) NOT NULL DEFAULT 'ORGANIZADOR',
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    fecha_registro TIMESTAMP NOT NULL DEFAULT NOW()
-);

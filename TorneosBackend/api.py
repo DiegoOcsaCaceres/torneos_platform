@@ -97,6 +97,11 @@ class CambiarPasswordRequest(BaseModel):
     password_actual: str
     password_nueva: str
 
+class ActualizarPerfilRequest(BaseModel):
+    nombres: str
+    apellido_paterno: str
+    apellido_materno: str
+
 class TorneoCreateRequest(BaseModel):
     tipo_deporte: str        # 'futbol' o 'voley'
     nombre_torneo: str
@@ -221,8 +226,41 @@ def login(payload: LoginRequest):
 
 @app.get("/auth/yo")
 def yo(usuario_actual: dict = Depends(obtener_usuario_actual)):
-    """Retorna los datos del usuario autenticado según su token. Sirve para validar sesión."""
-    return usuario_actual
+    """
+    Retorna los datos completos del usuario autenticado (nombres, apellidos, email, etc.)
+    consultando la BD por su id.
+
+    IMPORTANTE: usuario_actual (el payload del JWT) solo trae 'sub', 'email', 'rol' y 'exp'.
+    Si aquí se retornara usuario_actual directamente, el frontend jamás recibiría
+    nombres/apellidos tras un refresh de página (solo los tiene justo después del login,
+    porque /auth/login sí devuelve el registro completo).
+    """
+    try:
+        usuario = usuario_repo.obtener_por_id(int(usuario_actual["sub"]))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    return usuario
+
+@app.put("/auth/actualizar-perfil")
+def actualizar_perfil(
+    payload: ActualizarPerfilRequest,
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        usuario = auth_service.actualizar_perfil(
+            id_usuario=int(usuario_actual["sub"]),
+            nombres=payload.nombres,
+            apellido_paterno=payload.apellido_paterno,
+            apellido_materno=payload.apellido_materno,
+        )
+        return {"mensaje": "Perfil actualizado exitosamente.", "usuario": usuario}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RepositorioError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
 
 @app.put("/auth/cambiar-password")
 def cambiar_password(
@@ -554,4 +592,4 @@ def avanzar_ronda_endpoint(
     except FixtureError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     except RepositorioError as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))	
