@@ -76,6 +76,33 @@ class AuthService:
         )
         return self._usuario_repo.guardar(usuario)
 
+    # ── Actualización de datos personales ────────────────────────────────
+
+    def actualizar_perfil(
+        self,
+        id_usuario: int,
+        nombres: str,
+        apellido_paterno: str,
+        apellido_materno: str,
+    ) -> dict:
+        """
+        Valida y actualiza nombres/apellidos de un usuario existente.
+
+        Raises:
+            ValueError:       Si algún dato es inválido o está en blanco.
+            RepositorioError: Si falla la persistencia.
+        """
+        nombres = (nombres or '').strip()
+        apellido_paterno = (apellido_paterno or '').strip()
+        apellido_materno = (apellido_materno or '').strip()
+
+        if not nombres or not apellido_paterno or not apellido_materno:
+            raise ValueError("Nombres y apellidos son obligatorios.")
+
+        return self._usuario_repo.actualizar_datos(
+            id_usuario, nombres, apellido_paterno, apellido_materno
+        )
+
     # ── Cambio de contraseña ─────────────────────────────────────────────
 
     def cambiar_password(self, email: str, password_actual: str, password_nueva: str) -> None:

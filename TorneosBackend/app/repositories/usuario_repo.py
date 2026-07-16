@@ -98,6 +98,27 @@ class UsuarioRepository:
         finally:
             conn.close()
 
+    def actualizar_datos(self, id_usuario: int, nombres: str, apellido_paterno: str, apellido_materno: str) -> dict:
+        """Actualiza nombres y apellidos de un usuario y retorna el registro actualizado."""
+        sql = """
+            UPDATE Usuario
+            SET nombres = %s, apellido_paterno = %s, apellido_materno = %s
+            WHERE id_usuario = %s
+            RETURNING id_usuario, nombres, apellido_paterno, apellido_materno,
+                      email, rol, activo, fecha_registro
+        """
+        conn = obtener_conexion()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (nombres, apellido_paterno, apellido_materno, id_usuario))
+                    return dict(cur.fetchone())
+        except Exception as exc:
+            logger.error("UsuarioRepository.actualizar_datos -> %s", exc)
+            raise RepositorioError("Error al actualizar los datos del perfil.") from exc
+        finally:
+            conn.close()
+
     def actualizar_password(self, id_usuario: int, nuevo_password_hash: str) -> None:
         """Actualiza el hash de contraseña de un usuario."""
         sql = "UPDATE Usuario SET password_hash = %s WHERE id_usuario = %s"
